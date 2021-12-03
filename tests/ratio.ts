@@ -11,6 +11,7 @@ import {
 } from "@project-serum/anchor";
 import {
   Token as SplToken,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 // local
 import { Ratio } from '../target/types/ratio';
@@ -69,5 +70,22 @@ describe('ratio', () => {
       signers: [wallet.payer],
     });
     return signature;
+  });
+
+  it("initalize pool", async () => {
+    const signature: string = await program.rpc.initPool(poolBump, {
+      accounts: {
+        authority: wallet.publicKey,
+        state: statePda,
+        usdcMint: usdcMint.publicKey,
+        pool: poolPda,
+        poolUsdc: poolUsdcPda,
+        redeemableMint: redeemableMintPda,
+        rent,
+        systemProgram,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      },
+      signers: [wallet.payer],
+    });
   });
 });
