@@ -3,10 +3,27 @@ import React from "react";
 // mui
 import withStyles, { StyleRules } from "@mui/styles/withStyles";
 import { Stack, Theme } from "@mui/material";
+// components
+import Navbar from "./components/Navbar";
 
 interface IProps {
   classes?: any;
 }
+
+const NavBarStyles = (theme: Theme): StyleRules => ({
+  NavBar: {
+    minHeight: "100vh",
+    justifyContent: "start",
+  },
+});
+const NavBarComponent: React.FC<IProps> = ({ classes }) => {
+  return (
+    <Stack className={`${classes.NavBar} w100 flexcol`}>
+      <Navbar />
+    </Stack>
+  );
+};
+const NavBar = withStyles(NavBarStyles)(NavBarComponent);
 
 const AppStyles = (theme: Theme): StyleRules => ({
   App: {
@@ -28,6 +45,7 @@ const AppStyles = (theme: Theme): StyleRules => ({
 const AppComponent: React.FC<IProps> = ({ classes }) => {
   return (
     <Stack className={`${classes.App}`}>
+      <NavBar />
     </Stack>
   );
 };
