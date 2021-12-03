@@ -57,4 +57,17 @@ describe('ratio', () => {
         usdcMintAuth,
       });
   });
+
+  it("initalize state", async () => {
+    const signature: string = await program.rpc.initState(stateBump, {
+      accounts: {
+        authority: wallet.publicKey,
+        state: statePda,
+        rent,
+        systemProgram,
+      },
+      signers: [wallet.payer],
+    });
+    return signature;
+  });
 });
