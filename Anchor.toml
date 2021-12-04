@@ -1,12 +1,13 @@
 [programs.localnet]
-ratio = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+ratio = "6cDMc7baVfghT4sUx1t3sEfohxXyj4XwDr8pbarQfz1z"
 
-[registry]
-url = "https://anchor.projectserum.com"
+[clusters.localnet]
+ratio = "6cDMc7baVfghT4sUx1t3sEfohxXyj4XwDr8pbarQfz1z"
 
 [provider]
 cluster = "localnet"
 wallet = "/Users/matthias/.config/solana/id.json"
+
 
 [scripts]
 test = "ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
