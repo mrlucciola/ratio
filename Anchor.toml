@@ -1,8 +1,8 @@
 [programs.localnet]
-ratio = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+ratio = "6cDMc7baVfghT4sUx1t3sEfohxXyj4XwDr8pbarQfz1z"
 
-[registry]
-url = "https://anchor.projectserum.com"
+[clusters.localnet]
+ratio = "6cDMc7baVfghT4sUx1t3sEfohxXyj4XwDr8pbarQfz1z"
 
 [provider]
 cluster = "localnet"
