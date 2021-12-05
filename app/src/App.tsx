@@ -6,25 +6,27 @@ import { Stack, Theme } from "@mui/material";
 // components
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import Body from "./components/Body";
 
 interface IProps {
   classes?: any;
 }
 
-const NavBarStyles = (theme: Theme): StyleRules => ({
-  NavBar: {
+const NavAndBodyStyles = (theme: Theme): StyleRules => ({
+  NavAndBody: {
     minHeight: "100vh",
     justifyContent: "start",
   },
 });
-const NavBarComponent: React.FC<IProps> = ({ classes }) => {
+const NavAndBodyComponent: React.FC<IProps> = ({ classes }) => {
   return (
-    <Stack className={`${classes.NavBar} w100 flexcol`}>
+    <Stack className={`${classes.NavAndBody} w100 flexcol`}>
       <Navbar />
+      <Body />
     </Stack>
   );
 };
-const NavBar = withStyles(NavBarStyles)(NavBarComponent);
+const NavAndBody = withStyles(NavAndBodyStyles)(NavAndBodyComponent);
 
 const AppStyles = (theme: Theme): StyleRules => ({
   App: {
@@ -46,7 +48,7 @@ const AppStyles = (theme: Theme): StyleRules => ({
 const AppComponent: React.FC<IProps> = ({ classes }) => {
   return (
     <Stack className={`${classes.App}`}>
-      <NavBar />
+      <NavAndBody />
       <Footer />
     </Stack>
   );
