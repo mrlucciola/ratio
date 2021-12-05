@@ -5,6 +5,7 @@ import withStyles, { StyleRules } from "@mui/styles/withStyles";
 import { Stack, Theme } from "@mui/material";
 // components
 import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
 
 interface IProps {
   classes?: any;
@@ -46,6 +47,7 @@ const AppComponent: React.FC<IProps> = ({ classes }) => {
   return (
     <Stack className={`${classes.App}`}>
       <NavBar />
+      <Footer />
     </Stack>
   );
 };
