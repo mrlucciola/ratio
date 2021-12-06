@@ -1,0 +1,1 @@
+export const SET_CREATOR_OBJ = 'SET_CREATOR_OBJ';
