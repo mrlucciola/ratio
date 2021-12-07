@@ -1,12 +1,22 @@
-import _ from 'lodash';
-
 // types
-export const SET_CREATOR_OBJ = 'SET_CREATOR_OBJ';
+export const UPDATE_AMOUNT = 'UPDATE_AMOUNT';
+export const SET_DEPOSIT = 'SET_DEPOSIT';
+export const SET_WITHDRAW = 'SET_WITHDRAW';
 
 // actions
-export const setCreatorObj = (payload: any) => (dispatch: any) => {
+export const setWithdraw = () => (dispatch: any) => {
   dispatch({
-    type: SET_CREATOR_OBJ,
+    type: SET_WITHDRAW,
+  });
+};
+export const setDeposit = () => (dispatch: any) => {
+  dispatch({
+    type: SET_DEPOSIT,
+  });
+};
+export const updateAmount = (payload: any) => (dispatch: any) => {
+  dispatch({
+    type: UPDATE_AMOUNT,
     payload,
   });
 };
@@ -19,12 +29,22 @@ export const initState = {
 /**
  * main
  */
- const GeneralReducer = (state = _.cloneDeep(initState), action: any) => {
+ const GeneralReducer = (state = initState, action: any) => {
   switch (action.type) {
-    case SET_CREATOR_OBJ:
+    case UPDATE_AMOUNT:
       return {
         ...state,
-        creatorObj: action.payload,
+        amount: action.payload,
+      }
+    case SET_DEPOSIT:
+      return {
+        ...state,
+        action: 'Deposit',
+      }
+    case SET_WITHDRAW:
+      return {
+        ...state,
+        action: 'Withdraw',
       }
     default:
       return state;

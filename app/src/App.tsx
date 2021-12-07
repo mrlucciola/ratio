@@ -6,7 +6,7 @@ import { Stack, Theme } from "@mui/material";
 // components
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-// import Body from "./components/Body";
+import Body from "./components/Body";
 
 interface IProps {
   classes?: any;
@@ -22,7 +22,7 @@ const NavAndBodyComponent: React.FC<IProps> = ({ classes }) => {
   return (
     <Stack className={`${classes.NavAndBody} w100 flexcol`}>
       <Navbar />
-      {/* <Body /> */}
+      <Body />
     </Stack>
   );
 };
