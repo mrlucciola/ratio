@@ -8,10 +8,13 @@ import {
   web3,
   workspace,
   setProvider,
+  utils,
+  BN,
 } from "@project-serum/anchor";
 import {
   Token as SplToken,
   TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 // local
 import { Ratio } from '../target/types/ratio';
@@ -42,6 +45,7 @@ let poolBump: number;
 let userUsdcPda: web3.PublicKey;
 let poolUsdcPda: web3.PublicKey;
 let redeemableMintPda: web3.PublicKey;
+let userRedeemablePda: web3.PublicKey;
 
 describe('ratio', () => {
 
@@ -87,5 +91,94 @@ describe('ratio', () => {
       },
       signers: [wallet.payer],
     });
+  });
+
+  it("deposit funds", async () => {
+    // rederive this just as a sanity check
+    [userUsdcPda] = utils.publicKey.findProgramAddressSync(
+      [
+        wallet.publicKey.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        usdcMint.publicKey.toBuffer(),
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    [userRedeemablePda] = utils.publicKey.findProgramAddressSync(
+      [
+        wallet.publicKey.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        redeemableMintPda.toBuffer(),
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const ixns = [];
+
+    // create redeemable acct for user if !exist
+    if (!(await getProvider().connection.getAccountInfo(userRedeemablePda))) {
+      ixns.push(
+        SplToken.createAssociatedTokenAccountInstruction(
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+          TOKEN_PROGRAM_ID,
+          redeemableMintPda,
+          userRedeemablePda,
+          wallet.publicKey,
+          wallet.publicKey
+        )
+      );
+    }
+
+    const poolUsdcBalanceBefore: string = await poolBalance(
+      poolUsdcPda,
+      provider
+    );
+    console.log("     poolUsdcBalance before:", poolUsdcBalanceBefore);
+    const userUsdcBalanceBefore: string = await poolBalance(
+      userUsdcPda,
+      provider
+    );
+    console.log("     userUsdcBalance before:", userUsdcBalanceBefore);
+    console.log();
+    // approve a token transfer to avoid requiring the wallet
+    ixns.push(
+      SplToken.createApproveInstruction(
+        TOKEN_PROGRAM_ID,
+        userUsdcPda,
+        statePda,
+        wallet.publicKey,
+        [],
+        amount
+      )
+    );
+
+    const signature = await program.rpc.deposit(new BN(amount), {
+      accounts: {
+        state: statePda,
+        pool: poolPda,
+        poolUsdc: poolUsdcPda,
+        redeemableMint: redeemableMintPda,
+        userUsdc: userUsdcPda,
+        userRedeemable: userRedeemablePda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      },
+      signers: [wallet.payer],
+      instructions: ixns,
+    });
+    const poolUsdcBalanceAfter: string = await poolBalance(
+      poolUsdcPda,
+      provider
+    );
+    console.log("      poolUsdcBalance after:", poolUsdcBalanceAfter);
+    const userUsdcBalanceAfter: string = await poolBalance(
+      userUsdcPda,
+      provider
+    );
+    console.log("      userUsdcBalance after:", userUsdcBalanceAfter);
+    console.log();
+    const userRedeemableBalanceAfter: string = await poolBalance(
+      userRedeemablePda,
+      provider
+    );
+    console.log("userRedeemableBalance after:", userRedeemableBalanceAfter);
   });
 });

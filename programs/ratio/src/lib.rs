@@ -1,5 +1,5 @@
 use anchor_lang::{prelude::*, Discriminator};
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::token::{Mint, Token, TokenAccount, Transfer, transfer, MintTo, mint_to};
 
 declare_id!("6cDMc7baVfghT4sUx1t3sEfohxXyj4XwDr8pbarQfz1z");
 
@@ -20,6 +20,36 @@ pub mod ratio {
         ctx.accounts.pool.usdc_mint = ctx.accounts.usdc_mint.key(); //usdc_mint
         ctx.accounts.pool.pool_usdc = ctx.accounts.pool_usdc.key(); //pool_usdc
         ctx.accounts.pool.redeemable_mint = ctx.accounts.redeemable_mint.key(); //redeemable_mint
+
+        Ok(())
+    }
+    pub fn deposit<'info>(ctx: Context<Deposit>, amount: u64) -> ProgramResult {
+        let state_seed: &[&[&[u8]]] = &[&[&State::discriminator()[..], &[ctx.accounts.state.bump]]];
+
+        let transfer_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.user_usdc.to_account_info(),
+                to: ctx.accounts.pool_usdc.to_account_info(),
+                authority: ctx.accounts.state.to_account_info(),
+            },
+            state_seed,
+        );
+
+        // send the transfer
+        transfer(transfer_ctx, amount)?;
+
+        let mint_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            MintTo {
+                mint: ctx.accounts.redeemable_mint.to_account_info(),
+                to: ctx.accounts.user_redeemable.to_account_info(),
+                authority: ctx.accounts.state.to_account_info(),
+            },
+            state_seed,
+        );
+
+        mint_to(mint_ctx, amount)?;
 
         Ok(())
     }
@@ -101,4 +131,21 @@ pub struct Pool {
     usdc_mint: Pubkey,
     pool_usdc: Pubkey,
     redeemable_mint: Pubkey,
+}
+
+#[derive(Accounts)]
+pub struct Deposit<'info> {
+    #[account(seeds=[&State::discriminator()[..]], bump=state.bump)]
+    pub state: Account<'info, State>,
+    #[account(seeds=[&Pool::discriminator()[..], pool.usdc_mint.as_ref()], bump=pool.bump)]
+    pub pool: Account<'info, Pool>,
+    #[account(mut, address=pool.pool_usdc)]
+    pub pool_usdc: Account<'info, TokenAccount>,
+    #[account(mut, address=pool.redeemable_mint)]
+    pub redeemable_mint: Account<'info, Mint>,
+    #[account(mut, constraint= user_usdc.mint == pool.usdc_mint)]
+    pub user_usdc: Account<'info, TokenAccount>,
+    #[account(mut, constraint= user_redeemable.mint == pool.redeemable_mint)]
+    pub user_redeemable: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
 }
