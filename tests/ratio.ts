@@ -95,22 +95,14 @@ describe('ratio', () => {
 
   it("deposit funds", async () => {
     // rederive this just as a sanity check
-    [userUsdcPda] = utils.publicKey.findProgramAddressSync(
-      [
-        wallet.publicKey.toBuffer(),
-        TOKEN_PROGRAM_ID.toBuffer(),
-        usdcMint.publicKey.toBuffer(),
-      ],
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
-    [userRedeemablePda] = utils.publicKey.findProgramAddressSync(
-      [
-        wallet.publicKey.toBuffer(),
-        TOKEN_PROGRAM_ID.toBuffer(),
-        redeemableMintPda.toBuffer(),
-      ],
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
+    [userUsdcPda] = findPDA({
+      seeds: [wallet.publicKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(),usdcMint.publicKey.toBuffer()],
+      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+    });
+    [userRedeemablePda] = findPDA({
+      seeds: [wallet.publicKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(),redeemableMintPda.toBuffer()],
+      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+    });
 
     const ixns = [];
 
@@ -180,5 +172,41 @@ describe('ratio', () => {
       provider
     );
     console.log("userRedeemableBalance after:", userRedeemableBalanceAfter);
+  });
+
+  it("withdraw funds", async () => {
+    // rederive this just as a sanity check
+    [userUsdcPda] = findPDA({
+      seeds: [wallet.publicKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(),usdcMint.publicKey.toBuffer()],
+      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+    });
+    [userRedeemablePda] = findPDA({
+      seeds: [wallet.publicKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(),redeemableMintPda.toBuffer()],
+      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+    });
+
+    const ixns = [
+      SplToken.createApproveInstruction(
+        TOKEN_PROGRAM_ID,
+        userRedeemablePda,
+        statePda,
+        wallet.publicKey,
+        [],
+        amount
+      )
+    ];
+    const signature = await program.rpc.withdraw(new BN(amount / 2), {
+      accounts: {
+        state: statePda,
+        pool: poolPda,
+        poolUsdc: poolUsdcPda,
+        redeemableMint: redeemableMintPda,
+        userUsdc: userUsdcPda,
+        userRedeemable: userRedeemablePda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      },
+      signers: [wallet.payer],
+      instructions: ixns,
+    });
   });
 });
