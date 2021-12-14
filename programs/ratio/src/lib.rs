@@ -1,5 +1,10 @@
 use anchor_lang::{prelude::*, Discriminator};
-use anchor_spl::token::{Mint, Token, TokenAccount, Transfer, transfer, MintTo, mint_to, Burn, burn};
+use anchor_spl::token::{Transfer, transfer, MintTo, mint_to, Burn, burn};
+// local
+pub mod contexts;
+pub mod states;
+use crate::states::{State};
+pub use crate::contexts::*;
 
 declare_id!("6cDMc7baVfghT4sUx1t3sEfohxXyj4XwDr8pbarQfz1z");
 
@@ -87,116 +92,4 @@ pub mod ratio {
 
         Ok(())
     }
-}
-
-#[derive(Accounts)]
-#[instruction(state_bump: u8)]
-pub struct InitState<'info> {
-    pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    // state
-    #[account(
-        init,
-        payer=authority,
-        seeds=[&State::discriminator()[..]],
-        bump=state_bump,
-    )]
-    pub state: Account<'info, State>,
-}
-
-#[account]
-#[derive(Default)]
-pub struct State {
-    bump: u8,
-    authority: Pubkey,
-}
-
-#[derive(Accounts)]
-#[instruction(pool_bump: u8)]
-pub struct InitPool<'info> {
-    pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
-    pub token_program: Program<'info, Token>,
-    // auth
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    #[account(
-        seeds=[&State::discriminator()[..]],
-        bump=state.bump,
-        has_one=authority,
-    )]
-    pub state: Account<'info, State>,
-    #[account(
-        init,
-        seeds=[&Pool::discriminator()[..], usdc_mint.key().as_ref()],
-        bump=pool_bump,
-        payer=authority,
-    )]
-    pub pool: Account<'info, Pool>,
-    // mints
-    pub usdc_mint: Account<'info, Mint>,
-    #[account(
-        init,
-        seeds=[b"REDEEMABLE".as_ref(), usdc_mint.key().as_ref()],
-        bump,
-        mint::authority=state,
-        mint::decimals=usdc_mint.decimals,
-        payer=authority,
-    )]
-    pub redeemable_mint: Account<'info, Mint>,
-    // tokens
-    #[account(
-        init,
-        seeds=[b"USDC".as_ref(), usdc_mint.key().as_ref()],
-        bump,
-        token::mint=usdc_mint,
-        token::authority=state,
-        payer=authority,
-    )]
-    pub pool_usdc: Account<'info, TokenAccount>,
-}
-
-#[account]
-#[derive(Default)]
-pub struct Pool {
-    bump: u8,
-    usdc_mint: Pubkey,
-    pool_usdc: Pubkey,
-    redeemable_mint: Pubkey,
-}
-
-#[derive(Accounts)]
-pub struct Deposit<'info> {
-    #[account(seeds=[&State::discriminator()[..]], bump=state.bump)]
-    pub state: Account<'info, State>,
-    #[account(seeds=[&Pool::discriminator()[..], pool.usdc_mint.as_ref()], bump=pool.bump)]
-    pub pool: Account<'info, Pool>,
-    #[account(mut, address=pool.pool_usdc)]
-    pub pool_usdc: Account<'info, TokenAccount>,
-    #[account(mut, address=pool.redeemable_mint)]
-    pub redeemable_mint: Account<'info, Mint>,
-    #[account(mut, constraint= user_usdc.mint == pool.usdc_mint)]
-    pub user_usdc: Account<'info, TokenAccount>,
-    #[account(mut, constraint= user_redeemable.mint == pool.redeemable_mint)]
-    pub user_redeemable: Account<'info, TokenAccount>,
-    pub token_program: Program<'info, Token>,
-}
-
-#[derive(Accounts)]
-pub struct Withdraw<'info> {
-    #[account(seeds = [&State::discriminator()[..]], bump = state.bump)]
-    pub state: Account<'info, State>,
-    #[account(seeds = [&Pool::discriminator()[..], pool.usdc_mint.as_ref()], bump = pool.bump)]
-    pub pool: Account<'info, Pool>,
-    #[account(mut, address = pool.pool_usdc)]
-    pub pool_usdc: Account<'info, TokenAccount>,
-    #[account(mut, address = pool.redeemable_mint)]
-    pub redeemable_mint: Account<'info, Mint>,
-    #[account(mut, constraint = user_usdc.mint == pool.usdc_mint)]
-    pub user_usdc: Account<'info, TokenAccount>,
-    #[account(mut, constraint = user_redeemable.mint == pool.redeemable_mint)]
-    pub user_redeemable: Account<'info, TokenAccount>,
-    pub token_program: Program<'info, Token>,
 }
