@@ -1,10 +1,10 @@
 use anchor_lang::{prelude::*, Discriminator};
-use anchor_spl::token::{Transfer, transfer, MintTo, mint_to, Burn, burn};
+use anchor_spl::token::{mint_to, transfer, MintTo, Transfer};
 // local
 pub mod contexts;
 pub mod states;
-use crate::states::{State};
 pub use crate::contexts::*;
+use crate::states::State;
 
 declare_id!("6cDMc7baVfghT4sUx1t3sEfohxXyj4XwDr8pbarQfz1z");
 
@@ -15,6 +15,7 @@ pub mod ratio {
     pub fn init_state<'info>(ctx: Context<InitState>, state_bump: u8) -> ProgramResult {
         ctx.accounts.state.bump = state_bump;
         ctx.accounts.state.authority = ctx.accounts.authority.key();
+        ctx.accounts.state.last_minted = 0;
 
         Ok(())
     }
@@ -22,20 +23,45 @@ pub mod ratio {
     // initialize the pool so we can add usdc to it
     pub fn init_pool<'info>(ctx: Context<InitPool>, pool_bump: u8) -> ProgramResult {
         ctx.accounts.pool.bump = pool_bump;
-        ctx.accounts.pool.usdc_mint = ctx.accounts.usdc_mint.key(); //usdc_mint
-        ctx.accounts.pool.pool_usdc = ctx.accounts.pool_usdc.key(); //pool_usdc
-        ctx.accounts.pool.redeemable_mint = ctx.accounts.redeemable_mint.key(); //redeemable_mint
+        ctx.accounts.pool.usdc_mint = ctx.accounts.usdc_mint.key();
+        ctx.accounts.pool.pool_redeemable = ctx.accounts.pool_redeemable.key();
+        ctx.accounts.pool.redeemable_mint = ctx.accounts.redeemable_mint.key();
 
         Ok(())
     }
+
+    pub fn mint_to_pool<'info>(ctx: Context<MintToPool>, mint_amount: u64) -> ProgramResult {
+        let current_time = Clock::get().expect("Failed").unix_timestamp;
+
+        if current_time - ctx.accounts.state.last_minted > 60 {
+            let state_seed: &[&[&[u8]]] =
+                &[&[&State::discriminator()[..], &[ctx.accounts.state.bump]]];
+            let mint_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                MintTo {
+                    mint: ctx.accounts.redeemable_mint.to_account_info(),
+                    to: ctx.accounts.pool_redeemable.to_account_info(),
+                    authority: ctx.accounts.state.to_account_info(),
+                },
+                state_seed,
+            );
+
+            mint_to(mint_ctx, mint_amount)?;
+            // set new mint time
+            ctx.accounts.state.last_minted = current_time;
+        }
+
+        Ok(())
+    }
+
     pub fn deposit<'info>(ctx: Context<Deposit>, amount: u64) -> ProgramResult {
         let state_seed: &[&[&[u8]]] = &[&[&State::discriminator()[..], &[ctx.accounts.state.bump]]];
 
         let transfer_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
-                from: ctx.accounts.user_usdc.to_account_info(),
-                to: ctx.accounts.pool_usdc.to_account_info(),
+                from: ctx.accounts.user_redeemable.to_account_info(),
+                to: ctx.accounts.pool_redeemable.to_account_info(),
                 authority: ctx.accounts.state.to_account_info(),
             },
             state_seed,
@@ -44,45 +70,17 @@ pub mod ratio {
         // send the transfer
         transfer(transfer_ctx, amount)?;
 
-        let mint_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            MintTo {
-                mint: ctx.accounts.redeemable_mint.to_account_info(),
-                to: ctx.accounts.user_redeemable.to_account_info(),
-                authority: ctx.accounts.state.to_account_info(),
-            },
-            state_seed,
-        );
-
-        mint_to(mint_ctx, amount)?;
-
         Ok(())
     }
 
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> ProgramResult {
-
-        let state_seed: &[&[&[u8]]] = &[&[
-            &State::discriminator()[..],
-            &[ctx.accounts.state.bump],
-        ]];
-
-        let burn_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            Burn {
-                mint: ctx.accounts.redeemable_mint.to_account_info(),
-                to: ctx.accounts.user_redeemable.to_account_info(),
-                authority: ctx.accounts.state.to_account_info(),
-            },
-            state_seed,
-        );
-
-        burn(burn_ctx, amount)?;
+        let state_seed: &[&[&[u8]]] = &[&[&State::discriminator()[..], &[ctx.accounts.state.bump]]];
 
         let transfer_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
-                from: ctx.accounts.pool_usdc.to_account_info(),
-                to: ctx.accounts.user_usdc.to_account_info(),
+                from: ctx.accounts.pool_redeemable.to_account_info(),
+                to: ctx.accounts.user_redeemable.to_account_info(),
                 authority: ctx.accounts.state.to_account_info(),
             },
             state_seed,

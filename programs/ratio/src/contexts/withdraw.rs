@@ -10,13 +10,11 @@ pub struct Withdraw<'info> {
     pub state: Account<'info, State>,
     #[account(seeds = [&Pool::discriminator()[..], pool.usdc_mint.as_ref()], bump = pool.bump)]
     pub pool: Account<'info, Pool>,
-    #[account(mut, address = pool.pool_usdc)]
-    pub pool_usdc: Account<'info, TokenAccount>,
+    #[account(mut, address = pool.pool_redeemable)]
+    pub pool_redeemable: Account<'info, TokenAccount>,
     #[account(mut, address = pool.redeemable_mint)]
     pub redeemable_mint: Account<'info, Mint>,
-    #[account(mut, constraint = user_usdc.mint == pool.usdc_mint)]
-    pub user_usdc: Account<'info, TokenAccount>,
-    #[account(mut, constraint = user_redeemable.mint == pool.redeemable_mint)]
+    #[account(mut, constraint= user_redeemable.mint == pool.redeemable_mint)]
     pub user_redeemable: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
 }

@@ -4,8 +4,8 @@ use anchor_lang::{prelude::*};
 pub struct Pool {
     pub bump: u8,
     pub usdc_mint: Pubkey,
-    pub pool_usdc: Pubkey,
     pub redeemable_mint: Pubkey,
+    pub pool_redeemable: Pubkey,
 }
 
 #[account]
@@ -13,4 +13,5 @@ pub struct Pool {
 pub struct State {
     pub bump: u8,
     pub authority: Pubkey,
+    pub last_minted: i64,
 }

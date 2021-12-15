@@ -31,21 +31,20 @@ pub struct InitPool<'info> {
     pub usdc_mint: Account<'info, Mint>,
     #[account(
         init,
-        seeds=[b"REDEEMABLE".as_ref(), usdc_mint.key().as_ref()],
+        seeds=[b"REDEEMABLE_MINT".as_ref()],
         bump,
         mint::authority=state,
         mint::decimals=usdc_mint.decimals,
         payer=authority,
     )]
     pub redeemable_mint: Account<'info, Mint>,
-    // tokens
     #[account(
         init,
-        seeds=[b"USDC".as_ref(), usdc_mint.key().as_ref()],
+        seeds=[b"POOL_REDEEMABLE".as_ref(), redeemable_mint.key().as_ref()],
         bump,
-        token::mint=usdc_mint,
+        token::mint=redeemable_mint,
         token::authority=state,
         payer=authority,
     )]
-    pub pool_usdc: Account<'info, TokenAccount>,
+    pub pool_redeemable: Account<'info, TokenAccount>,
 }

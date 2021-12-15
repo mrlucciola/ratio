@@ -9,3 +9,6 @@ pub use deposit::*;
 
 pub mod withdraw;
 pub use withdraw::*;
+
+pub mod mint_to_pool;
+pub use mint_to_pool::*;

@@ -5,16 +5,14 @@ use anchor_spl::token::{TokenAccount, Mint, Token};
 use crate::states::{Pool, State};
 
 #[derive(Accounts)]
-pub struct Deposit<'info> {
+pub struct MintToPool<'info> {
     #[account(seeds=[&State::discriminator()[..]], bump=state.bump)]
     pub state: Account<'info, State>,
     #[account(seeds=[&Pool::discriminator()[..], pool.usdc_mint.as_ref()], bump=pool.bump)]
     pub pool: Account<'info, Pool>,
-    #[account(mut, constraint= pool_redeemable.mint == pool.redeemable_mint)]
-    pub pool_redeemable: Account<'info, TokenAccount>,
     #[account(mut, address=pool.redeemable_mint)]
     pub redeemable_mint: Account<'info, Mint>,
-    #[account(mut, constraint= user_redeemable.mint == pool.redeemable_mint)]
-    pub user_redeemable: Account<'info, TokenAccount>,
+    #[account(mut, constraint= pool_redeemable.mint == pool.redeemable_mint)]
+    pub pool_redeemable: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
 }

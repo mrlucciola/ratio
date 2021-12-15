@@ -8,7 +8,6 @@ import {
   web3,
   workspace,
   setProvider,
-  utils,
   BN,
 } from "@project-serum/anchor";
 import {
@@ -17,7 +16,7 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 // local
-import { Ratio } from '../target/types/ratio';
+import { Ratio } from "../target/types/ratio";
 import { initializeTestState } from "./utils/initializeState";
 import { findPDA, poolBalance } from "./utils/utils";
 
@@ -42,25 +41,28 @@ let stateBump: number;
 let usdcMint: SplToken;
 let poolPda: web3.PublicKey;
 let poolBump: number;
-let userUsdcPda: web3.PublicKey;
-let poolUsdcPda: web3.PublicKey;
 let redeemableMintPda: web3.PublicKey;
 let userRedeemablePda: web3.PublicKey;
+let poolRedeemablePda: web3.PublicKey;
 
-describe('ratio', () => {
-
+describe("ratio", () => {
   before(async () => {
     [statePda, stateBump] = findPDA({
       programId: program.programId,
       name: "State",
     });
-    [usdcMint, poolPda, poolBump, poolUsdcPda, redeemableMintPda, userUsdcPda] =
-      await initializeTestState({
-        USDC_DECIMALS,
-        provider,
-        program,
-        usdcMintAuth,
-      });
+    [
+      usdcMint,
+      poolPda,
+      poolBump,
+      poolRedeemablePda,
+      redeemableMintPda,
+    ] = await initializeTestState({
+      USDC_DECIMALS,
+      provider,
+      program,
+      usdcMintAuth,
+    });
   });
 
   it("initalize state", async () => {
@@ -83,7 +85,7 @@ describe('ratio', () => {
         state: statePda,
         usdcMint: usdcMint.publicKey,
         pool: poolPda,
-        poolUsdc: poolUsdcPda,
+        poolRedeemable: poolRedeemablePda,
         redeemableMint: redeemableMintPda,
         rent,
         systemProgram,
@@ -93,14 +95,97 @@ describe('ratio', () => {
     });
   });
 
-  it("deposit funds", async () => {
-    // rederive this just as a sanity check
-    [userUsdcPda] = findPDA({
-      seeds: [wallet.publicKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(),usdcMint.publicKey.toBuffer()],
+  // were using the mintToPool function to mint to user for init
+  it("mint init user balance", async () => {
+    const mintAmount = 27 * 10 ** USDC_DECIMALS;
+    [userRedeemablePda] = findPDA({
+      seeds: [
+        wallet.publicKey.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        redeemableMintPda.toBuffer(),
+      ],
       programId: ASSOCIATED_TOKEN_PROGRAM_ID,
     });
+    const ixns = [];
+    if (!(await getProvider().connection.getAccountInfo(userRedeemablePda))) {
+      ixns.push(
+        SplToken.createAssociatedTokenAccountInstruction(
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+          TOKEN_PROGRAM_ID,
+          redeemableMintPda,
+          userRedeemablePda,
+          wallet.publicKey,
+          wallet.publicKey
+        )
+      );
+    }
+
+    const signature: string = await program.rpc.mintToPool(new BN(mintAmount), {
+      accounts: {
+        state: statePda,
+        pool: poolPda,
+        redeemableMint: redeemableMintPda,
+        poolRedeemable: userRedeemablePda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      },
+      signers: [wallet.payer],
+      instructions: ixns,
+    });
+    console.log(
+      "userRedeemablePda Balance after mint:",
+      await poolBalance(userRedeemablePda, provider)
+    );
+  });
+
+  it("mint to pool", async () => {
+    const mintAmount = (3.14 / 100) * 10 ** USDC_DECIMALS;
     [userRedeemablePda] = findPDA({
-      seeds: [wallet.publicKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(),redeemableMintPda.toBuffer()],
+      seeds: [
+        wallet.publicKey.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        redeemableMintPda.toBuffer(),
+      ],
+      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+    });
+    const ixns = [];
+    if (!(await getProvider().connection.getAccountInfo(poolRedeemablePda))) {
+      ixns.push(
+        SplToken.createAssociatedTokenAccountInstruction(
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+          TOKEN_PROGRAM_ID,
+          redeemableMintPda,
+          poolRedeemablePda,
+          wallet.publicKey,
+          wallet.publicKey
+        )
+      );
+    }
+
+    const signature: string = await program.rpc.mintToPool(new BN(mintAmount), {
+      accounts: {
+        state: statePda,
+        pool: poolPda,
+        redeemableMint: redeemableMintPda,
+        poolRedeemable: poolRedeemablePda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      },
+      signers: [wallet.payer],
+      instructions: ixns,
+    });
+    console.log(
+      "poolRedeemablePda Balance after mint:",
+      await poolBalance(poolRedeemablePda, provider)
+    );
+  });
+
+  it("deposit funds", async () => {
+    // rederive as a sanity check
+    [userRedeemablePda] = findPDA({
+      seeds: [
+        wallet.publicKey.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        redeemableMintPda.toBuffer(),
+      ],
       programId: ASSOCIATED_TOKEN_PROGRAM_ID,
     });
 
@@ -120,68 +205,55 @@ describe('ratio', () => {
       );
     }
 
-    const poolUsdcBalanceBefore: string = await poolBalance(
-      poolUsdcPda,
-      provider
-    );
-    console.log("     poolUsdcBalance before:", poolUsdcBalanceBefore);
-    const userUsdcBalanceBefore: string = await poolBalance(
-      userUsdcPda,
-      provider
-    );
-    console.log("     userUsdcBalance before:", userUsdcBalanceBefore);
-    console.log();
-    // approve a token transfer to avoid requiring the wallet
+    // approve a token transfer
     ixns.push(
       SplToken.createApproveInstruction(
         TOKEN_PROGRAM_ID,
-        userUsdcPda,
+        userRedeemablePda,
         statePda,
         wallet.publicKey,
         [],
         amount
       )
     );
-
+    console.log(
+      "userRedeemablePda Balance before:",
+      await poolBalance(userRedeemablePda, provider)
+    );
+    console.log(
+      "poolRedeemablePda Balance before:",
+      await poolBalance(poolRedeemablePda, provider)
+    );
     const signature = await program.rpc.deposit(new BN(amount), {
       accounts: {
         state: statePda,
         pool: poolPda,
-        poolUsdc: poolUsdcPda,
         redeemableMint: redeemableMintPda,
-        userUsdc: userUsdcPda,
         userRedeemable: userRedeemablePda,
+        poolRedeemable: poolRedeemablePda,
         tokenProgram: TOKEN_PROGRAM_ID,
       },
       signers: [wallet.payer],
       instructions: ixns,
     });
-    const poolUsdcBalanceAfter: string = await poolBalance(
-      poolUsdcPda,
-      provider
+    console.log(
+      "userRedeemablePda Balance after:",
+      await poolBalance(userRedeemablePda, provider)
     );
-    console.log("      poolUsdcBalance after:", poolUsdcBalanceAfter);
-    const userUsdcBalanceAfter: string = await poolBalance(
-      userUsdcPda,
-      provider
+    console.log(
+      "poolRedeemablePda Balance after:",
+      await poolBalance(poolRedeemablePda, provider)
     );
-    console.log("      userUsdcBalance after:", userUsdcBalanceAfter);
-    console.log();
-    const userRedeemableBalanceAfter: string = await poolBalance(
-      userRedeemablePda,
-      provider
-    );
-    console.log("userRedeemableBalance after:", userRedeemableBalanceAfter);
   });
 
   it("withdraw funds", async () => {
-    // rederive this just as a sanity check
-    [userUsdcPda] = findPDA({
-      seeds: [wallet.publicKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(),usdcMint.publicKey.toBuffer()],
-      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
-    });
+    // rederive as a sanity check
     [userRedeemablePda] = findPDA({
-      seeds: [wallet.publicKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(),redeemableMintPda.toBuffer()],
+      seeds: [
+        wallet.publicKey.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        redeemableMintPda.toBuffer(),
+      ],
       programId: ASSOCIATED_TOKEN_PROGRAM_ID,
     });
 
@@ -193,20 +265,35 @@ describe('ratio', () => {
         wallet.publicKey,
         [],
         amount
-      )
+      ),
     ];
+    console.log(
+      "userRedeemablePda Balance before:",
+      await poolBalance(userRedeemablePda, provider)
+    );
+    console.log(
+      "poolRedeemablePda Balance before:",
+      await poolBalance(poolRedeemablePda, provider)
+    );
     const signature = await program.rpc.withdraw(new BN(amount / 2), {
       accounts: {
         state: statePda,
         pool: poolPda,
-        poolUsdc: poolUsdcPda,
+        poolRedeemable: poolRedeemablePda,
         redeemableMint: redeemableMintPda,
-        userUsdc: userUsdcPda,
         userRedeemable: userRedeemablePda,
         tokenProgram: TOKEN_PROGRAM_ID,
       },
       signers: [wallet.payer],
       instructions: ixns,
     });
+    console.log(
+      "userRedeemablePda Balance after:",
+      await poolBalance(userRedeemablePda, provider)
+    );
+    console.log(
+      "poolRedeemablePda Balance after:",
+      await poolBalance(poolRedeemablePda, provider)
+    );
   });
 });
