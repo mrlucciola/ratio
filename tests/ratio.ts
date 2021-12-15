@@ -1,253 +1,237 @@
-// import { getTokenAccount } from "@project-serum/common";
-import * as anchor from "@project-serum/anchor";
 import {
   Provider,
   Program,
   Wallet,
   BN,
   getProvider,
+  web3,
+  workspace,
+  setProvider,
+  utils,
 } from "@project-serum/anchor";
 import {
+  Token as SplToken,
   TOKEN_PROGRAM_ID,
-  // ASSOCIATED_TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import {
-  // Transaction,
-  Keypair,
-  PublicKey,
-  SystemProgram,
-  SYSVAR_RENT_PUBKEY,
-} from "@solana/web3.js";
-import { Ratio, IDL } from "../target/types/ratio";
-const assert = require("assert");
-import {
-  // sleep,
-  // getTokenAccount,
-  createMint,
-  createTokenAccount,
-  mintToAccount,
-} from "./utils";
+// utils
 
-// program constants
-const NATIVE_SOL_MINT = new PublicKey(
-  "So11111111111111111111111111111111111111112"
-);
-const POOL_PROGRAM_ID = new PublicKey(
-  "6cDMc7baVfghT4sUx1t3sEfohxXyj4XwDr8pbarQfz1z"
-);
+// local
+import { Ratio } from "../target/types/ratio";
+import { initializeTestState } from "./utils/initializeState";
+import { findPDA, poolBalance } from "./utils/utils";
 
-// seed constants
-const PREFIX = Buffer.from("pool_acct");
-const TREASURY = Buffer.from("treasury");
-const FEE_PAYER = Buffer.from("fee_payer");
+// general constants
+const USDC_DECIMALS: number = 8;
+const systemProgram = web3.SystemProgram.programId;
+const rent = web3.SYSVAR_RENT_PUBKEY;
 
-describe("ratio", async () => {
-  // Configure the client to use the local cluster.
-  const program = anchor.workspace.Ratio as Program<Ratio>;
-  const envProvider = anchor.Provider.env();
-  anchor.setProvider(envProvider);
-  const authorityProvider = getProvider(); // === program.provider.wallet.publicKey
-  const authorityWallet = authorityProvider.wallet; // === program.provider.wallet.publicKey
-  const authorityPubKey = authorityWallet.publicKey;
+// init
+setProvider(Provider.local());
+const provider: Provider = getProvider();
+// @ts-ignore
+const wallet: Wallet = provider.wallet;
 
-  // let authorityClient: Program<Ratio>;
-  // buyer vars
-  // let buyerClient: Program<Ratio>;
-  // const buyerWallet = Keypair.generate();
-  // let buyerEscrow: PublicKey;
-  // let buyerEscrowBump: number;
+const program = workspace.Ratio as Program<Ratio>;
+console.log(`ratio programId: ${program.programId.toString()}`);
 
-  // constant accounts
-  // const treasuryMint = NATIVE_SOL_MINT;
-  const systemProgram = SystemProgram.programId;
-  const rent = SYSVAR_RENT_PUBKEY;
-  // const ataProgram = ASSOCIATED_TOKEN_PROGRAM_ID;
-  // const treasuryWithdrawalDestination = authorityPubKey;
-  // const treasuryWithdrawalDestinationOwner = authorityPubKey;
+// for the redeemable
+const usdcMintAuth: web3.Keypair = new web3.Keypair();
+let usdcMint: SplToken;
+let poolPda: web3.PublicKey;
+let poolBump: number;
+let userUsdcPda: web3.PublicKey;
+let poolUsdcPda: web3.PublicKey;
+let redeemableMintPda: web3.PublicKey;
+let userRedeemablePda: web3.PublicKey;
+let statePda: web3.PublicKey;
+let stateBump: number;
 
-  // uninit constant accounts
-  // let pool: PublicKey;
-  // let poolTreasury: PublicKey;
-  // let poolTreasuryBump: number;
-  // let bump: number;
-  // let poolFeeAccount: PublicKey;
-  // let poolFeeAccountBump: number;
-  let poolSigner: PublicKey;
-  let watermelonMint: PublicKey;
-  let poolAccountKeypair: Keypair;
-  let poolAccountPubKey: PublicKey;
-  let creatorWatermelon: PublicKey;
-  let nonce: number;
-  // let poolAccount = null;
-  let usdcMint: PublicKey;
-  let creatorUsdc: PublicKey;
-  const watermelonIdoAmount = new anchor.BN(5000000);
+const amount = 10 ** USDC_DECIMALS;
 
-  // it("more init", async () => {
-  //   buyerClient = new Program<Ratio>(
-  //     IDL,
-  //     POOL_PROGRAM_ID,
-  //     new Provider(
-  //       getProvider().connection,
-  //       new Wallet(buyerWallet),
-  //       Provider.defaultOptions()
-  //     )
-  //   );
-  // });
-
-  it("init state", async () => {
-    watermelonMint = await createMint(envProvider, undefined);
-    usdcMint = await createMint(envProvider, undefined);
-    creatorUsdc = await createTokenAccount(
-      envProvider,
-      usdcMint,
-      envProvider.wallet.publicKey
-    );
-    creatorWatermelon = await createTokenAccount(
-      envProvider,
-      watermelonMint,
-      envProvider.wallet.publicKey
-    );
-
-    await mintToAccount(
-      envProvider,
-      watermelonMint,
-      creatorWatermelon,
-      watermelonIdoAmount,
-      envProvider.wallet.publicKey
-    );
-  });
-
-  // init pools
-  let poolWatermelon: PublicKey;
-  let poolUsdc: PublicKey;
-  let redeemableMint: PublicKey;
-
-  it("init pool", async () => {
-    const [_poolSigner, _nonce] =
-      await anchor.web3.PublicKey.findProgramAddress(
-        [watermelonMint.toBuffer()],
-        program.programId
-      );
-    poolSigner = _poolSigner;
-    nonce = _nonce;
-
-    redeemableMint = await createMint(envProvider, poolSigner);
-    poolWatermelon = await createTokenAccount(
-      envProvider,
-      watermelonMint,
-      poolSigner
-    );
-    poolUsdc = await createTokenAccount(envProvider, usdcMint, poolSigner);
-    poolAccountKeypair = anchor.web3.Keypair.generate();
-    poolAccountPubKey = poolAccountKeypair.publicKey;
-
-    console.log("\n\n*************");
-    console.log("params", new BN(100), new BN(nonce));
-    await program.rpc.initializePool(
-      new BN(nonce), // nonce
-      new BN(nonce), // nonce
-      // new BN(100), // watermelonIdoAmount
-      {
-        accounts: {
-          tokenProgram: TOKEN_PROGRAM_ID,
-          rent,
-          systemProgram,
-
-          authority: authorityPubKey, //AccountInfo<'info> = distributionAuthority
-
-          usdcMint,
-          creatorWatermelon,
-          poolUsdc,
-          poolAccount: poolAccountPubKey,
-          poolSigner,
-          poolWatermelon,
-          redeemableMint,
-        },
-        signers: [poolAccountKeypair],
-        // instructions: [
-        //   await program.account.poolAccount.createInstruction(
-        //     poolAccountKeypair
-        //   ),
-        // ],
-      }
-    );
-    console.log("donezo");
-  });
-
-  let userUsdc = null;
-  let userRedeemable = null;
-  const firstDeposit = new anchor.BN(22_070_349);
-
-  it("Exchanges user USDC for redeemable tokens", async () => {
-    userUsdc = await createTokenAccount(
-      envProvider,
-      usdcMint,
-      envProvider.wallet.publicKey
-    );
-
-    await mintToAccount(
-      envProvider,
-      usdcMint,
-      userUsdc,
-      firstDeposit,
-      envProvider.wallet.publicKey
-    );
-
-    userRedeemable = await createTokenAccount(
-      envProvider,
-      redeemableMint,
-      envProvider.wallet.publicKey
-    );
-
-    try {
-      const tx = await program.rpc.exchangeUsdcForRedeemable(firstDeposit, {
-        accounts: {
-          poolAccount: poolAccountPubKey,
-          poolSigner,
-          redeemableMint,
-          poolUsdc,
-          userAuthority: envProvider.wallet.publicKey,
-          userUsdc,
-          userRedeemable,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        },
+describe("ratio", () => {
+  before(async () => {
+    [statePda, stateBump] = findPDA({
+      programId: program.programId,
+      name: "State",
+    });
+    [usdcMint, poolPda, poolBump, poolUsdcPda, redeemableMintPda, userUsdcPda] =
+      await initializeTestState({
+        USDC_DECIMALS,
+        provider,
+        program,
+        usdcMintAuth,
       });
-    } catch (err) {
-      console.log("This is the error message", err.toString());
-    }
-
-    // poolUsdcAccount = await getTokenAccount(provider, poolUsdc);
-    // assert.ok(poolUsdcAccount.amount.eq(firstDeposit));
-    // userRedeemableAccount = await getTokenAccount(provider, userRedeemable);
-    // assert.ok(userRedeemableAccount.amount.eq(firstDeposit));
   });
 
-  const firstWithdrawal = new anchor.BN(2_000_000);
-
-  it("Exchanges user Redeemable tokens for USDC", async () => {
-    await program.rpc.exchangeRedeemableForUsdc(firstWithdrawal, {
+  it("initalize state", async () => {
+    const signature: string = await program.rpc.initState(stateBump, {
       accounts: {
-        poolAccount: poolAccountPubKey,
-        poolSigner,
-        redeemableMint,
-        poolUsdc,
-        userAuthority: envProvider.wallet.publicKey,
-        userUsdc,
-        userRedeemable,
+        authority: wallet.publicKey,
+        state: statePda,
+        rent,
+        systemProgram,
+      },
+      signers: [wallet.payer],
+    });
+    return signature;
+  });
+
+  it("initalize pool", async () => {
+    const signature: string = await program.rpc.initPool(poolBump, {
+      accounts: {
+        authority: wallet.publicKey,
+        state: statePda,
+        usdcMint: usdcMint.publicKey,
+        pool: poolPda,
+        poolUsdc: poolUsdcPda,
+        redeemableMint: redeemableMintPda,
+        rent,
+        systemProgram,
         tokenProgram: TOKEN_PROGRAM_ID,
       },
+      signers: [wallet.payer],
     });
-
-    // totalPoolUsdc = totalPoolUsdc.sub(firstWithdrawal);
-    // poolUsdcAccount = await getTokenAccount(provider, poolUsdc);
-    // assert.ok(poolUsdcAccount.amount.eq(totalPoolUsdc));
-    // userUsdcAccount = await getTokenAccount(provider, userUsdc);
-    // assert.ok(userUsdcAccount.amount.eq(firstWithdrawal));
   });
-  // {
-  //   poolAccount,
-  //   userAuthority,
-  //   userRedeemable,
-  // }
+
+  it("deposit funds", async () => {
+    // rederive this just as a sanity check
+    [userUsdcPda] = utils.publicKey.findProgramAddressSync(
+      [
+        wallet.publicKey.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        usdcMint.publicKey.toBuffer(),
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    [userRedeemablePda] = utils.publicKey.findProgramAddressSync(
+      [
+        wallet.publicKey.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        redeemableMintPda.toBuffer(),
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const ixns = [];
+
+    // create redeemable acct for user if !exist
+    if (!(await getProvider().connection.getAccountInfo(userRedeemablePda))) {
+      ixns.push(
+        SplToken.createAssociatedTokenAccountInstruction(
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+          TOKEN_PROGRAM_ID,
+          redeemableMintPda,
+          userRedeemablePda,
+          wallet.publicKey,
+          wallet.publicKey
+        )
+      );
+    }
+
+    const poolUsdcBalanceBefore: string = await poolBalance(
+      poolUsdcPda,
+      provider
+    );
+    console.log("     poolUsdcBalance before:", poolUsdcBalanceBefore);
+    const userUsdcBalanceBefore: string = await poolBalance(
+      userUsdcPda,
+      provider
+    );
+    console.log("     userUsdcBalance before:", userUsdcBalanceBefore);
+    console.log();
+    // approve a token transfer to avoid requiring the wallet
+    ixns.push(
+      SplToken.createApproveInstruction(
+        TOKEN_PROGRAM_ID,
+        userUsdcPda,
+        statePda,
+        wallet.publicKey,
+        [],
+        amount
+      )
+    );
+
+    const signature = await program.rpc.deposit(new BN(amount), {
+      accounts: {
+        state: statePda,
+        pool: poolPda,
+        poolUsdc: poolUsdcPda,
+        redeemableMint: redeemableMintPda,
+        userUsdc: userUsdcPda,
+        userRedeemable: userRedeemablePda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      },
+      signers: [wallet.payer],
+      instructions: ixns,
+    });
+    const poolUsdcBalanceAfter: string = await poolBalance(
+      poolUsdcPda,
+      provider
+    );
+    console.log("      poolUsdcBalance after:", poolUsdcBalanceAfter);
+    const userUsdcBalanceAfter: string = await poolBalance(
+      userUsdcPda,
+      provider
+    );
+    console.log("      userUsdcBalance after:", userUsdcBalanceAfter);
+    console.log();
+    const userRedeemableBalanceAfter: string = await poolBalance(
+      userRedeemablePda,
+      provider
+    );
+    console.log("userRedeemableBalance after:", userRedeemableBalanceAfter);
+  });
+
+  it("withdraw funds", async () => {
+    // rederive this just as a sanity check
+    [userUsdcPda] = utils.publicKey.findProgramAddressSync(
+      [
+        wallet.publicKey.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        usdcMint.publicKey.toBuffer(),
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    [userUsdcPda] = findPDA({
+      seeds: [wallet.publicKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(),usdcMint.publicKey.toBuffer()],
+      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+    });
+    // [userRedeemablePda] = findPDA({
+    //   seeds: [wallet.publicKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(),redeemableMintPda.toBuffer()],
+    //   programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+    // });
+    [userRedeemablePda] = utils.publicKey.findProgramAddressSync(
+      [
+        wallet.publicKey.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        redeemableMintPda.toBuffer(),
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const ixns = [
+      SplToken.createApproveInstruction(
+        TOKEN_PROGRAM_ID,
+        userRedeemablePda,
+        statePda,
+        wallet.publicKey,
+        [],
+        amount
+      )
+    ];
+    const signature = await program.rpc.withdraw(new BN(amount / 2), {
+      accounts: {
+        state: statePda,
+        pool: poolPda,
+        poolUsdc: poolUsdcPda,
+        redeemableMint: redeemableMintPda,
+        userUsdc: userUsdcPda,
+        userRedeemable: userRedeemablePda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      },
+      signers: [wallet.payer],
+      instructions: ixns,
+    });
+  });
 });

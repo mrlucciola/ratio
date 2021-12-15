@@ -2,11 +2,12 @@
 import React, { useEffect, useState } from "react";
 // mui
 import withStyles, { StyleRules } from "@mui/styles/withStyles";
-import { Button, Paper, TextField, Theme, Typography } from "@mui/material";
+import { Button, Paper, Snackbar, TextField, Theme, Typography } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
 // web3
-import * as web3 from '@solana/web3.js';
+import {Keypair, Connection} from "@solana/web3.js";
 import Wallet from "@project-serum/sol-wallet-adapter";
+import { loadKeypair } from "../redux/reducer";
 
 // component
 interface IProps {
@@ -24,10 +25,9 @@ const BodyStyles = (theme: Theme): StyleRules => {
       },
     },
     input: {
-      '&.MuiTextField-root': {
+      "&.MuiTextField-root": {
         margin: `10px 0px`,
-
-      }
+      },
     },
     submit: {
       "&.MuiButton-root.MuiButton-contained.MuiButton-containedPrimary": {
@@ -45,20 +45,37 @@ const BodyComponent: React.FC<IProps> = ({ classes }) => {
   // init hooks
   const dispatch = useAppDispatch();
   // state
-  const action = useAppSelector((s) => s.action);
-  const [input, setInput] = useState("");
-  const [rpcConnection, setRpcConnection] = useState<web3.Connection>();
+  const action: string = useAppSelector((s) => s.action);
+  const kp: any = useAppSelector((s) => s.keypair);
+  const [isOpen, setIsOpen]: [boolean, Function] = useState<boolean>(false);
+  const [input, setInput]: [string, Function] = useState<string>("");
+  const [rpcConnection, setRpcConnection] = useState<Connection>();
   // fxns
   const submitWithdrawal = () => {};
-  const submitDeposit = () => {};
-  const submitAction = () => {
-    action === "Deposit" && submitDeposit();
-    action === "Withdraw" && submitWithdrawal();
+  const submitDeposit = async () => {};
+  const submitAction = async () => {
+    if (['Deposit', 'Withdraw'].includes(action)) {
+      try {
+        action === "Deposit" && await submitDeposit();
+        action === "Withdraw" && await submitWithdrawal();
+        handleClick();
+      } catch (error) {
+        alert(error);
+      }
+    }
+  };
+  const handleClick = () => {
+    const keypair: Keypair = new Keypair();
+    dispatch(loadKeypair(keypair));
+    setIsOpen(true);
+  };
+  const handleClose = () => {
+    setIsOpen(false);
   };
   const getConnection = async () => {
-    const connection: web3.Connection = new web3.Connection(
-      "http://localhost:8899", // web3.clusterApiUrl(""),
-      'confirmed',
+    const connection: Connection = new Connection(
+      "http://localhost:8899", // clusterApiUrl(""),
+      "confirmed"
     );
     setRpcConnection(connection);
   };
@@ -73,7 +90,9 @@ const BodyComponent: React.FC<IProps> = ({ classes }) => {
       }
     }
   };
-  const getRecentBlockhashAndFees = async (connection: web3.Connection) => {return await connection.getRecentBlockhash()};
+  const getRecentBlockhashAndFees = async (connection: Connection) => {
+    return await connection.getRecentBlockhash();
+  };
 
   // effects
   useEffect(() => {
@@ -101,9 +120,16 @@ const BodyComponent: React.FC<IProps> = ({ classes }) => {
         className={`${classes.submit} w100 flexcol`}
         variant="contained"
         onClick={submitAction}
+        disabled={!kp || input === ""}
       >
         {action}
       </Button>
+      <Snackbar
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        open={isOpen}
+        onClose={handleClose}
+        message={`Submitting ${action.toLowerCase()} for ${input} tokens`}
+      />
     </Paper>
   );
 };

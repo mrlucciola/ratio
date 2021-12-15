@@ -4,16 +4,14 @@ use {
         prelude::*,
         solana_program::{
             program::invoke_signed,
-            program_option::COption,
             program_pack::{IsInitialized, Pack},
             system_instruction,
         },
     },
-    anchor_spl::token::{Mint, Token, TokenAccount},
-    arrayref::array_ref,
+    anchor_spl::token::{Mint, Token},
     spl_associated_token_account::get_associated_token_address,
     spl_token::{instruction::initialize_account2, state::Account},
-    std::{convert::TryInto, slice::Iter},
+    std::{convert::TryInto},
 };
 
 /// Create account almost from scratch, lifted from

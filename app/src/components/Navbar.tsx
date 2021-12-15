@@ -1,15 +1,13 @@
 // react
-import React from "react";
+import React, { useState } from "react";
 // mui
 import withStyles, { StyleRules } from "@mui/styles/withStyles";
-import { Button, Theme, Typography } from "@mui/material";
-import { blue, grey } from "@mui/material/colors";
+import { Button, Snackbar, Theme, Typography } from "@mui/material";
+import { blue, grey, teal, common, blueGrey } from "@mui/material/colors";
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
-import { setDeposit, setWithdraw } from "../redux/reducer";
+import { loadKeypair, setDeposit, setWithdraw } from "../redux/reducer";
+import { Keypair } from "@solana/web3.js";
 // components
-// import NavGroupRight from './NavGroupRight';
-// import NavGroupCenter from './NavGroupCenter';
-// import NavGroupLeft from './NavGroupLeft';
 // interfaces
 interface IProps {
   classes?: any;
@@ -45,6 +43,7 @@ const RatioLogoComponent: React.FC<IProps> = ({ classes }) => {
   );
 };
 const RatioLogo = withStyles(RatioLogoStyles)(RatioLogoComponent);
+
 // component
 const DepositButtonStyles = (theme: Theme): StyleRules => ({
   Button: {
@@ -52,9 +51,6 @@ const DepositButtonStyles = (theme: Theme): StyleRules => ({
     maxWidth: "300px",
     minWidth: "100%",
     display: "flex",
-  },
-  active: {
-    backgroundColor: blue['A100'],
   },
   text: {
     padding: `0 20px`,
@@ -71,7 +67,7 @@ const DepositButtonComponent: React.FC<IProps> = ({ classes }) => {
       onClick={() => {dispatch(setDeposit())}}
       variant="contained"
       style={{
-        backgroundColor: action === 'Deposit' ? blue['800']: blue['400'],
+        backgroundColor: action === 'Deposit' ? blue['800']: blueGrey['300'],
         color: action === 'Deposit' ? grey['50']: grey['400'],
       }}
       disableElevation={action !== 'Deposit'}
@@ -97,7 +93,7 @@ const WithdrawButtonComponent: React.FC<IProps> = ({ classes }) => {
       onClick={() => {dispatch(setWithdraw())}}
       variant="contained"
       style={{
-        backgroundColor: action === 'Withdraw' ? blue['800']: blue['400'],
+        backgroundColor: action === 'Withdraw' ? blue['800']: blueGrey['300'],
         color: action === 'Withdraw' ? grey['50']: grey['400'],
       }}
       disableElevation={action !== 'Withdraw'}
@@ -109,6 +105,66 @@ const WithdrawButtonComponent: React.FC<IProps> = ({ classes }) => {
   );
 };
 const WithdrawButton = withStyles(DepositButtonStyles)(WithdrawButtonComponent);
+
+// component
+const ConnectButtonStyles = (theme: Theme): StyleRules => ({
+  Button: {
+    '&.MuiButton-root': {
+      position: 'absolute',
+      right: 0,
+      backgroundColor: teal['200'],
+      color: grey["700"],
+    },
+    '&.MuiButton-root:hover': {
+      backgroundColor: teal['100'],
+      borderColor: '#0062cc',
+      boxShadow: 'none',
+    },
+    minHeight: "70px",
+    maxWidth: "300px",
+    minWidth: "100%",
+    display: "flex",
+  },
+  text: {
+    padding: `0 20px`,
+  },
+});
+const ConnectButtonComponent: React.FC<IProps> = ({ classes }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dispatch = useAppDispatch();
+  const kp: any = useAppSelector(s => s.keypair);
+
+  const handleClick = () => {
+    const keypair: Keypair = new Keypair();
+    dispatch(loadKeypair(keypair));
+    setIsOpen(true);
+  };
+
+  const handleClose = () => {
+    setIsOpen(false);
+  };
+
+  return (
+    <>
+      <Button
+        className={`${classes.Button} flexcol`}
+        variant="contained"
+        onClick={handleClick}
+      >
+        <Typography component="div" className={`${classes.text}`}>
+          {`Generate & connect to random wallet`}
+        </Typography>
+      </Button>
+      <Snackbar
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        open={isOpen}
+        onClose={handleClose}
+        message={`Successfully loaded keypair: \n${kp && kp.publicKey}`}
+      />
+    </>
+  );
+};
+const ConnectButton = withStyles(ConnectButtonStyles)(ConnectButtonComponent);
 
 /**
  * Navbar
@@ -124,12 +180,14 @@ const NavbarStyles = (theme: Theme): StyleRules => ({
   mainNav: {},
 });
 const NavbarComponent: React.FC<IProps> = ({ classes }) => {
+  
   return (
     <div className={`${classes.Navbar} w100 flexcol`}>
       <div className={`${classes.mainNav} h100 flexrow coreElem`}>
         <RatioLogo />
         <DepositButton />
         <WithdrawButton />
+        <ConnectButton />
       </div>
     </div>
   );
