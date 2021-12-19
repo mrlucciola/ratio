@@ -76,7 +76,7 @@ const FooterStyles = (theme: Theme): StyleRules => ({
  });
 const FooterComponent: FC<FooterProps> = ({ classes }) => {
   const column1 = (
-    <Grid direction="column" flexWrap="nowrap" alignSelf="flex-start" item xs={xs}>
+    <Grid flexDirection="column" flexWrap="nowrap" alignSelf="flex-start" item xs={xs}>
       <FooterHeader text="Company" />
       <ul className={`${classes.columnLinks} flexcol`}>
         <FooterLink text={"About us"} />
@@ -89,7 +89,7 @@ const FooterComponent: FC<FooterProps> = ({ classes }) => {
     </Grid>
   );
   const column2 = (
-    <Grid direction="column" flexWrap="nowrap" alignSelf="flex-start" item xs={xs}>
+    <Grid flexDirection="column" flexWrap="nowrap" alignSelf="flex-start" item xs={xs}>
       <FooterHeader text="Platform" />
       <ul className={`${classes.columnLinks} flexcol`}>
         <FooterLink text={"Documentation"} />
@@ -100,7 +100,7 @@ const FooterComponent: FC<FooterProps> = ({ classes }) => {
     </Grid>
   );
   const column3 = (
-    <Grid direction="column" flexWrap="nowrap" alignSelf="flex-start" item xs={xs}>
+    <Grid flexDirection="column" flexWrap="nowrap" alignSelf="flex-start" item xs={xs}>
       <FooterHeader text="Social" />
       <ul className={`${classes.columnLinks} flexcol`}>
         <FooterLink text={"Discord"} />
@@ -110,7 +110,7 @@ const FooterComponent: FC<FooterProps> = ({ classes }) => {
     </Grid>
   );
   const column4 = (
-    <Grid direction="column" flexWrap="nowrap" alignSelf="flex-start" item xs={xs}>
+    <Grid flexDirection="column" flexWrap="nowrap" alignSelf="flex-start" item xs={xs}>
       <FooterHeader text="Legal" />
       <ul className={`${classes.columnLinks} flexcol`}>
         <FooterLink text={"Terms"} />

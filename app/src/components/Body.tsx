@@ -2,12 +2,26 @@
 import React, { useEffect, useState } from "react";
 // mui
 import withStyles, { StyleRules } from "@mui/styles/withStyles";
-import { Button, Paper, Snackbar, TextField, Theme, Typography } from "@mui/material";
+import {
+  Button,
+  Paper,
+  Snackbar,
+  TextField,
+  Theme,
+  Typography,
+} from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
 // web3
-import {Keypair, Connection} from "@solana/web3.js";
+import { web3, Provider } from "@project-serum/anchor";
+import { Keypair, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import Wallet from "@project-serum/sol-wallet-adapter";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { loadKeypair } from "../redux/reducer";
+import MintElem from "./MintElem";
+import { useAnchorWallet, useWallet } from "@solana/wallet-adapter-react";
+// local
+// import * as idl from "../idl.json";
+// const programId = new web3.PublicKey(idl.metadata.address);
 
 // component
 interface IProps {
@@ -23,6 +37,9 @@ const BodyStyles = (theme: Theme): StyleRules => {
       "&.MuiPaper-rounded": {
         borderRadius: radiusAmt,
       },
+    },
+    text: {
+      padding: `20px 0`,
     },
     input: {
       "&.MuiTextField-root": {
@@ -43,21 +60,52 @@ const BodyStyles = (theme: Theme): StyleRules => {
 
 const BodyComponent: React.FC<IProps> = ({ classes }) => {
   // init hooks
+  // const wallet = useAnchorWallet();
+  // const wallet = useWallet();
   const dispatch = useAppDispatch();
   // state
   const action: string = useAppSelector((s) => s.action);
-  const kp: any = useAppSelector((s) => s.keypair);
+  const statePda: web3.PublicKey = useAppSelector((s) => s.statePda);
+  const poolPda: web3.PublicKey = useAppSelector((s) => s.poolPda);
+  const connection = useAppSelector((s) => s.connection);
+  const provider: Provider = useAppSelector((s) => s.provider);
+  const redeemableMintPda: web3.PublicKey = useAppSelector(
+    (s) => s.redeemableMintPda
+  );
+  const poolRedeemablePda: web3.PublicKey = useAppSelector(
+    (s) => s.poolRedeemablePda
+  );
+  const keypair: any = useAppSelector((s) => s.keypair);
   const [isOpen, setIsOpen]: [boolean, Function] = useState<boolean>(false);
   const [input, setInput]: [string, Function] = useState<string>("");
-  const [rpcConnection, setRpcConnection] = useState<Connection>();
+  // const [provider, setProvider] = useState<Provider>();
+  const [tokenAmt, setTokenAmt] = useState<number>();
   // fxns
+  const getBalance = async (publicKey: web3.PublicKey) => {
+    try {
+      // @ts-ignore
+      const res: web3.RpcResponseAndContext<web3.TokenAmount> =
+        await provider?.connection.getTokenAccountBalance(poolRedeemablePda);
+
+      const _tokenAmt = Number(res.value.amount);
+      const lamports = await connection.getBalance(publicKey);
+      // console.log('lamps', lamports / LAMPORTS_PER_SOL)
+      // console.log('tokenAmt', tokenAmt / LAMPORTS_PER_SOL)
+      setTokenAmt(_tokenAmt);
+      // console.log(_tokenAmt / LAMPORTS_PER_SOL);
+      // @ts-ignore
+      return lamports / LAMPORTS_PER_SOL;
+    } catch (error) {
+      console.log("error", error);
+    }
+  };
   const submitWithdrawal = () => {};
   const submitDeposit = async () => {};
   const submitAction = async () => {
-    if (['Deposit', 'Withdraw'].includes(action)) {
+    if (["Deposit", "Withdraw"].includes(action)) {
       try {
-        action === "Deposit" && await submitDeposit();
-        action === "Withdraw" && await submitWithdrawal();
+        action === "Deposit" && (await submitDeposit());
+        action === "Withdraw" && (await submitWithdrawal());
         handleClick();
       } catch (error) {
         alert(error);
@@ -72,35 +120,23 @@ const BodyComponent: React.FC<IProps> = ({ classes }) => {
   const handleClose = () => {
     setIsOpen(false);
   };
-  const getConnection = async () => {
-    const connection: Connection = new Connection(
-      "http://localhost:8899", // clusterApiUrl(""),
-      "confirmed"
-    );
-    setRpcConnection(connection);
-  };
-  const getProvider = async () => {
-    const { solana: provider } = window;
-    if (provider) {
-      await provider.connect();
 
-      if (provider.isPhantom) {
-        console.log("Is Phantom installed?  ", provider.isPhantom);
-        return provider;
-      }
-    }
-  };
-  const getRecentBlockhashAndFees = async (connection: Connection) => {
-    return await connection.getRecentBlockhash();
-  };
 
   // effects
   useEffect(() => {
-    getConnection();
-  }, []);
+    provider && getBalance(keypair.publicKey);
+  }, [provider]);
 
   return (
     <Paper className={`${classes.Body} flexcol`} variant="outlined">
+      <div className={`${classes.text}`}>
+        <Typography>
+          {action === "Deposit" &&
+            "Deposit funds to the pool, or mint directly to the pool"}
+          {action === "Withdraw" && "Withdraw funds from the pool"}
+        </Typography>
+      </div>
+      <MintElem />
       <TextField
         className={classes.input}
         label={`${action} amount`}
@@ -120,12 +156,12 @@ const BodyComponent: React.FC<IProps> = ({ classes }) => {
         className={`${classes.submit} w100 flexcol`}
         variant="contained"
         onClick={submitAction}
-        disabled={!kp || input === ""}
+        disabled={!keypair || input === ""}
       >
         {action}
       </Button>
       <Snackbar
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         open={isOpen}
         onClose={handleClose}
         message={`Submitting ${action.toLowerCase()} for ${input} tokens`}

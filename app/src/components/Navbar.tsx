@@ -4,9 +4,13 @@ import React, { useState } from "react";
 import withStyles, { StyleRules } from "@mui/styles/withStyles";
 import { Button, Snackbar, Theme, Typography } from "@mui/material";
 import { blue, grey, teal, blueGrey } from "@mui/material/colors";
+// web3
+import { AppBar, Container, makeStyles, Toolbar } from "@material-ui/core";
+import { WalletMultiButton } from "@solana/wallet-adapter-material-ui";
+// others
+import { Keypair } from "@solana/web3.js";
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
 import { loadKeypair, setDeposit, setWithdraw } from "../redux/reducer";
-import { Keypair } from "@solana/web3.js";
 // components
 // interfaces
 interface IProps {
@@ -122,17 +126,19 @@ const ConnectButtonStyles = (theme: Theme): StyleRules => ({
     },
     minHeight: "70px",
     maxWidth: "300px",
-    minWidth: "100%",
+    // @ts-ignore
+    width: "100%",
     display: "flex",
   },
   text: {
     padding: `0 20px`,
   },
 });
+
 const ConnectButtonComponent: React.FC<IProps> = ({ classes }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dispatch = useAppDispatch();
-  const kp: any = useAppSelector(s => s.keypair);
+  const kp: Keypair | undefined = useAppSelector(s => s.keypair);
 
   const handleClick = () => {
     const keypair: Keypair = new Keypair();
@@ -143,16 +149,17 @@ const ConnectButtonComponent: React.FC<IProps> = ({ classes }) => {
   const handleClose = () => {
     setIsOpen(false);
   };
-
   return (
     <>
-      <Button
+      <WalletMultiButton className={`${classes.Button} flexcol`} />
+      {/* <Button
         className={`${classes.Button} flexcol`}
         variant="contained"
         onClick={handleClick}
+        disabled={!!kp}
       >
-        <Typography component="div" className={`${classes.text}`}>
-          {`Generate & connect to random wallet`}
+        <Typography component="div" className={`${classes.text} w100`} noWrap>
+          {kp ? kp?.publicKey.toString(): `Generate & connect to random wallet`}
         </Typography>
       </Button>
       <Snackbar
@@ -160,7 +167,7 @@ const ConnectButtonComponent: React.FC<IProps> = ({ classes }) => {
         open={isOpen}
         onClose={handleClose}
         message={`Successfully loaded keypair: \n${kp && kp.publicKey}`}
-      />
+      /> */}
     </>
   );
 };
@@ -187,6 +194,7 @@ const NavbarComponent: React.FC<IProps> = ({ classes }) => {
         <RatioLogo />
         <DepositButton />
         <WithdrawButton />
+        {/* <WalletMultiButton /> */}
         <ConnectButton />
       </div>
     </div>

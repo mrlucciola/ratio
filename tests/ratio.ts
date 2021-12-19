@@ -18,7 +18,12 @@ import {
 // local
 import { Ratio } from "../target/types/ratio";
 import { initializeTestState } from "./utils/initializeState";
-import { findPDA, poolBalance } from "./utils/utils";
+import {
+  findPDA,
+  getBalance,
+  mintAndDepositTokens,
+  poolBalance,
+} from "./utils/utils";
 
 // general constants
 const systemProgram = web3.SystemProgram.programId;
@@ -42,6 +47,7 @@ let usdcMint: SplToken;
 let poolPda: web3.PublicKey;
 let poolBump: number;
 let redeemableMintPda: web3.PublicKey;
+let redeemableMintBump: number;
 let userRedeemablePda: web3.PublicKey;
 let poolRedeemablePda: web3.PublicKey;
 
@@ -57,6 +63,7 @@ describe("ratio", () => {
       poolBump,
       poolRedeemablePda,
       redeemableMintPda,
+      redeemableMintBump,
     ] = await initializeTestState({
       USDC_DECIMALS,
       provider,
@@ -93,6 +100,76 @@ describe("ratio", () => {
       },
       signers: [wallet.payer],
     });
+  });
+
+  it("mint and deposit", async () => {
+    // get mint pda
+    // const [mintPda, mintPdaBump] = await anchor.web3.PublicKey.findProgramAddress(
+    //   [Buffer.from(anchor.utils.bytes.utf8.encode("MINT_AND_DEPOSIT"))],
+    //   program.programId);
+
+    // const receiver = new web3.PublicKey("8hpvAu6cq6qzVM4NpXp9bH2uuT4PEYMJvrXKrSd5tdfR");
+    const ixns = [];
+    if (!(await getProvider().connection.getAccountInfo(poolRedeemablePda))) {
+      ixns.push(
+        SplToken.createAssociatedTokenAccountInstruction(
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+          TOKEN_PROGRAM_ID,
+          redeemableMintPda,
+          poolRedeemablePda,
+          wallet.publicKey,
+          wallet.publicKey
+        )
+      );
+    }
+    console.log('iasdifsidnfsodifn', ixns)
+
+    let associatedTokenAccount = await SplToken.getAssociatedTokenAddress(
+      ASSOCIATED_TOKEN_PROGRAM_ID,
+      TOKEN_PROGRAM_ID,
+      redeemableMintPda,
+      poolRedeemablePda,
+      true
+    );
+    console.log(`              receiver: ${poolRedeemablePda}`);
+    console.log(
+      `               mintPda: ${redeemableMintPda} - ${redeemableMintBump}`
+    );
+    console.log(`associatedTokenAccount: ${associatedTokenAccount}`);
+    // FIRST AIRDROP
+    const firstAirdropAmount = 100;
+    await mintAndDepositTokens(
+      firstAirdropAmount,
+      redeemableMintPda,
+      redeemableMintBump,
+      poolRedeemablePda,
+      associatedTokenAccount,
+      statePda,
+      program,
+      ixns,
+    );
+    let balance = await getBalance(
+      poolRedeemablePda,
+      redeemableMintPda,
+      provider
+    );
+    console.log('balalalla', balance)
+    // assert.ok(balance == firstAirdropAmount);
+
+    // SECOND AIRDROP
+    // const secondAirdropAmount = 200;
+    // await mintAndDepositTokens(
+    //   secondAirdropAmount,
+    //   redeemableMintPda,
+    //   redeemableMintBump,
+    //   poolRedeemablePda,
+    //   associatedTokenAccount,
+    //   statePda
+    //   program,
+    //   ixns,
+    // );
+    // balance = await getBalance(poolRedeemablePda, redeemableMintPda, provider);
+    // assert.ok(balance == firstAirdropAmount + secondAirdropAmount);
   });
 
   // were using the mintToPool function to mint to user for init

@@ -17,7 +17,7 @@ export const initializeTestState = async (testParams) => {
   );
 
   // find redeemable mint
-  const [redeemableMintPda] = findPDA({
+  const [redeemableMintPda, redeemableMintBump] = findPDA({
     programId: program.programId,
     seeds: [Buffer.from("REDEEMABLE_MINT")],
   });
@@ -38,5 +38,6 @@ export const initializeTestState = async (testParams) => {
     poolBump,
     poolRedeemablePda,
     redeemableMintPda,
-  ] as [SplToken, web3.PublicKey, number, web3.PublicKey, web3.PublicKey];
+    redeemableMintBump,
+  ] as [SplToken, web3.PublicKey, number, web3.PublicKey, web3.PublicKey, number];
 };
