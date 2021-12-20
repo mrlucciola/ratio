@@ -1,8 +1,9 @@
 // modules
 import { createStore, applyMiddleware } from 'redux';
 import thunk from 'redux-thunk';
+import { initState } from './initState';
 // redux
-import reducer, { initState } from './reducer';
+import reducer from './reducer';
 
 const middleware = [thunk];
 

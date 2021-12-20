@@ -1,9 +1,7 @@
 // modules
-// import * as anchor from '@project-serum/anchor';
 import {
   Provider,
   Program,
-  Wallet,
   getProvider,
   web3,
   workspace,
@@ -17,360 +15,227 @@ import {
 } from "@solana/spl-token";
 // local
 import { Ratio } from "../target/types/ratio";
-import { initializeTestState } from "./utils/initializeState";
+import { MintAndDeposit } from "../target/types/mint_and_deposit";
 import {
-  findPDA,
-  getBalance,
-  mintAndDepositTokens,
-  poolBalance,
+  getTokenBalance,
+  initEnvironment,
+  TOKEN_DECMIALS,
+  IDeployer,
+  IUser,
+  handleTxn,
 } from "./utils/utils";
-
 // general constants
 const systemProgram = web3.SystemProgram.programId;
 const rent = web3.SYSVAR_RENT_PUBKEY;
-const USDC_DECIMALS: number = 8;
-const amount = 10 ** USDC_DECIMALS;
+
+const mintAmount = 3.14 * 10 ** TOKEN_DECMIALS;
+const withdrawAmount = mintAmount / 2;
+const depositAmount = withdrawAmount / 2;
 
 setProvider(Provider.local());
 const provider: Provider = getProvider();
 // @ts-ignore
-const wallet: Wallet = provider.wallet;
-
-const program = workspace.Ratio as Program<Ratio>;
-console.log(`ratio programId: ${program.programId.toString()}`);
+const programMintCpi = workspace.MintAndDeposit as Program<MintAndDeposit>;
+const programRatio = workspace.Ratio as Program<Ratio>;
+console.log(`ratio program ID: ${programRatio.programId.toString()}`);
+console.log(`mintCpi program ID: ${programMintCpi.programId.toString()}`);
 
 // test constants
-const usdcMintAuth: web3.Keypair = new web3.Keypair();
-let statePda: web3.PublicKey;
-let stateBump: number;
-let usdcMint: SplToken;
-let poolPda: web3.PublicKey;
-let poolBump: number;
-let redeemableMintPda: web3.PublicKey;
-let redeemableMintBump: number;
-let userRedeemablePda: web3.PublicKey;
-let poolRedeemablePda: web3.PublicKey;
+let deployer: IDeployer;
+let user1: IUser;
+let user2: IUser;
 
 describe("ratio", () => {
   before(async () => {
-    [statePda, stateBump] = findPDA({
-      programId: program.programId,
-      name: "State",
-    });
-    [
-      usdcMint,
-      poolPda,
-      poolBump,
-      poolRedeemablePda,
-      redeemableMintPda,
-      redeemableMintBump,
-    ] = await initializeTestState({
-      USDC_DECIMALS,
-      provider,
-      program,
-      usdcMintAuth,
-    });
+    // @ts-ignore
+    const envObj = await initEnvironment(provider, programRatio);
+    deployer = envObj.deployer;
+    user1 = envObj.user1;
+    user2 = envObj.user2;
   });
 
   it("initalize state", async () => {
-    const signature: string = await program.rpc.initState(stateBump, {
-      accounts: {
-        authority: wallet.publicKey,
-        state: statePda,
-        rent,
-        systemProgram,
-      },
-      signers: [wallet.payer],
-    });
-    return signature;
+    const txnState = new web3.Transaction();
+    txnState.add(programRatio.instruction.initState(
+      deployer.state.bump,
+      {
+        accounts: {
+          authority: deployer.wallet.publicKey,
+          state: deployer.state.pda,
+          rent,
+          systemProgram,
+        },
+        signers: [deployer.wallet.payer],
+      }
+    ));
+    const confirmation = await handleTxn(txnState, provider, deployer.wallet);
+    console.log("initialized state successfully!\n", confirmation, !!(await provider.connection.getAccountInfo(deployer.state.pda)));
   });
 
   it("initalize pool", async () => {
-    const signature: string = await program.rpc.initPool(poolBump, {
-      accounts: {
-        authority: wallet.publicKey,
-        state: statePda,
-        usdcMint: usdcMint.publicKey,
-        pool: poolPda,
-        poolRedeemable: poolRedeemablePda,
-        redeemableMint: redeemableMintPda,
-        rent,
-        systemProgram,
-        tokenProgram: TOKEN_PROGRAM_ID,
-      },
-      signers: [wallet.payer],
-    });
-  });
-
-  it("mint and deposit", async () => {
-    // get mint pda
-    // const [mintPda, mintPdaBump] = await anchor.web3.PublicKey.findProgramAddress(
-    //   [Buffer.from(anchor.utils.bytes.utf8.encode("MINT_AND_DEPOSIT"))],
-    //   program.programId);
-
-    // const receiver = new web3.PublicKey("8hpvAu6cq6qzVM4NpXp9bH2uuT4PEYMJvrXKrSd5tdfR");
-    const ixns = [];
-    if (!(await getProvider().connection.getAccountInfo(poolRedeemablePda))) {
-      ixns.push(
-        SplToken.createAssociatedTokenAccountInstruction(
-          ASSOCIATED_TOKEN_PROGRAM_ID,
-          TOKEN_PROGRAM_ID,
-          redeemableMintPda,
-          poolRedeemablePda,
-          wallet.publicKey,
-          wallet.publicKey
-        )
-      );
-    }
-    console.log('iasdifsidnfsodifn', ixns)
-
-    let associatedTokenAccount = await SplToken.getAssociatedTokenAddress(
-      ASSOCIATED_TOKEN_PROGRAM_ID,
-      TOKEN_PROGRAM_ID,
-      redeemableMintPda,
-      poolRedeemablePda,
-      true
-    );
-    console.log(`              receiver: ${poolRedeemablePda}`);
+    const txnPool = new web3.Transaction();
+    txnPool.add(programRatio.instruction.initPool(
+      deployer.pool.bump,
+      TOKEN_DECMIALS,
+      {
+        accounts: {
+          authority: deployer.wallet.publicKey,
+          state: deployer.state.pda,
+          pool: deployer.pool.pda,
+          poolCurrency: deployer.pool.currency.pda,
+          currencyMint: deployer.currency.mint,
+          rent,
+          systemProgram,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
+      }
+    ));
+    const confirmation = await handleTxn(txnPool, provider, deployer.wallet);
     console.log(
-      `               mintPda: ${redeemableMintPda} - ${redeemableMintBump}`
-    );
-    console.log(`associatedTokenAccount: ${associatedTokenAccount}`);
-    // FIRST AIRDROP
-    const firstAirdropAmount = 100;
-    await mintAndDepositTokens(
-      firstAirdropAmount,
-      redeemableMintPda,
-      redeemableMintBump,
-      poolRedeemablePda,
-      associatedTokenAccount,
-      statePda,
-      program,
-      ixns,
-    );
-    let balance = await getBalance(
-      poolRedeemablePda,
-      redeemableMintPda,
-      provider
-    );
-    console.log('balalalla', balance)
-    // assert.ok(balance == firstAirdropAmount);
-
-    // SECOND AIRDROP
-    // const secondAirdropAmount = 200;
-    // await mintAndDepositTokens(
-    //   secondAirdropAmount,
-    //   redeemableMintPda,
-    //   redeemableMintBump,
-    //   poolRedeemablePda,
-    //   associatedTokenAccount,
-    //   statePda
-    //   program,
-    //   ixns,
-    // );
-    // balance = await getBalance(poolRedeemablePda, redeemableMintPda, provider);
-    // assert.ok(balance == firstAirdropAmount + secondAirdropAmount);
-  });
-
-  // were using the mintToPool function to mint to user for init
-  it("mint init user balance", async () => {
-    const mintAmount = 27 * 10 ** USDC_DECIMALS;
-    [userRedeemablePda] = findPDA({
-      seeds: [
-        wallet.publicKey.toBuffer(),
-        TOKEN_PROGRAM_ID.toBuffer(),
-        redeemableMintPda.toBuffer(),
-      ],
-      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
-    });
-    const ixns = [];
-    if (!(await getProvider().connection.getAccountInfo(userRedeemablePda))) {
-      ixns.push(
-        SplToken.createAssociatedTokenAccountInstruction(
-          ASSOCIATED_TOKEN_PROGRAM_ID,
-          TOKEN_PROGRAM_ID,
-          redeemableMintPda,
-          userRedeemablePda,
-          wallet.publicKey,
-          wallet.publicKey
-        )
-      );
-    }
-
-    const signature: string = await program.rpc.mintToPool(new BN(mintAmount), {
-      accounts: {
-        state: statePda,
-        pool: poolPda,
-        redeemableMint: redeemableMintPda,
-        poolRedeemable: userRedeemablePda,
-        tokenProgram: TOKEN_PROGRAM_ID,
-      },
-      signers: [wallet.payer],
-      instructions: ixns,
-    });
-    console.log(
-      "userRedeemablePda Balance after mint:",
-      await poolBalance(userRedeemablePda, provider)
+      "Created the pool: successful!\n",
+      confirmation,
+      !!(await getProvider().connection.getAccountInfo(deployer.currency.mint))
     );
   });
 
-  it("mint to pool", async () => {
-    const mintAmount = (3.14 / 100) * 10 ** USDC_DECIMALS;
-    [userRedeemablePda] = findPDA({
-      seeds: [
-        wallet.publicKey.toBuffer(),
-        TOKEN_PROGRAM_ID.toBuffer(),
-        redeemableMintPda.toBuffer(),
-      ],
-      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
-    });
-    const ixns = [];
-    if (!(await getProvider().connection.getAccountInfo(poolRedeemablePda))) {
-      ixns.push(
-        SplToken.createAssociatedTokenAccountInstruction(
-          ASSOCIATED_TOKEN_PROGRAM_ID,
-          TOKEN_PROGRAM_ID,
-          redeemableMintPda,
-          poolRedeemablePda,
-          wallet.publicKey,
-          wallet.publicKey
-        )
-      );
-    }
-
-    const signature: string = await program.rpc.mintToPool(new BN(mintAmount), {
-      accounts: {
-        state: statePda,
-        pool: poolPda,
-        redeemableMint: redeemableMintPda,
-        poolRedeemable: poolRedeemablePda,
-        tokenProgram: TOKEN_PROGRAM_ID,
-      },
-      signers: [wallet.payer],
-      instructions: ixns,
-    });
-    console.log(
-      "poolRedeemablePda Balance after mint:",
-      await poolBalance(poolRedeemablePda, provider)
-    );
-  });
-
-  it("deposit funds", async () => {
-    // rederive as a sanity check
-    [userRedeemablePda] = findPDA({
-      seeds: [
-        wallet.publicKey.toBuffer(),
-        TOKEN_PROGRAM_ID.toBuffer(),
-        redeemableMintPda.toBuffer(),
-      ],
-      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
-    });
-
-    const ixns = [];
-
-    // create redeemable acct for user if !exist
-    if (!(await getProvider().connection.getAccountInfo(userRedeemablePda))) {
-      ixns.push(
-        SplToken.createAssociatedTokenAccountInstruction(
-          ASSOCIATED_TOKEN_PROGRAM_ID,
-          TOKEN_PROGRAM_ID,
-          redeemableMintPda,
-          userRedeemablePda,
-          wallet.publicKey,
-          wallet.publicKey
-        )
-      );
-    }
-
-    // approve a token transfer
-    ixns.push(
-      SplToken.createApproveInstruction(
+  it('init user account', async () => {
+    const txnUserAssoc = new web3.Transaction();
+    txnUserAssoc.add(
+      SplToken.createAssociatedTokenAccountInstruction(
+        ASSOCIATED_TOKEN_PROGRAM_ID,
         TOKEN_PROGRAM_ID,
-        userRedeemablePda,
-        statePda,
-        wallet.publicKey,
-        [],
-        amount
+        deployer.currency.mint,
+        user1.currency.assoc,
+        user1.wallet.publicKey,
+        user1.wallet.publicKey,
       )
     );
+    try {
+      const confirmationUserAssoc = await handleTxn(txnUserAssoc, provider, user1.wallet);
+      console.log('user assoc initialized!', confirmationUserAssoc);
+    } catch (error) {
+      console.log(error)
+      process.exit()
+    }
+  });
+
+  it("mint to pool cpi", async () => {
+    const txnMint = new web3.Transaction();
+    const poolBalancePre = await getTokenBalance(deployer.pool.currency.pda,provider);
+
+    txnMint.add(programMintCpi.instruction.mintAndDepositCpi(
+      new BN(Number(mintAmount)),
+      {
+        accounts: {
+          state: deployer.state.pda,
+          currencyMint: deployer.currency.mint,
+          destCurrency: deployer.pool.currency.pda,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          ratioProgram: programRatio.programId,
+        },
+      }
+    ));
+    try {
+      const confirmation = await handleTxn(txnMint, provider, deployer.wallet);
+      console.log("Pool: Mint To Address confirmation: ", confirmation);
+    } catch (e) {
+      console.log(e)
+      console.log(e.code, e.msg);
+    }
+    const poolBalancePost = await getTokenBalance(deployer.pool.currency.pda, provider);
     console.log(
-      "userRedeemablePda Balance before:",
-      await poolBalance(userRedeemablePda, provider)
-    );
-    console.log(
-      "poolRedeemablePda Balance before:",
-      await poolBalance(poolRedeemablePda, provider)
-    );
-    const signature = await program.rpc.deposit(new BN(amount), {
-      accounts: {
-        state: statePda,
-        pool: poolPda,
-        redeemableMint: redeemableMintPda,
-        userRedeemable: userRedeemablePda,
-        poolRedeemable: poolRedeemablePda,
-        tokenProgram: TOKEN_PROGRAM_ID,
-      },
-      signers: [wallet.payer],
-      instructions: ixns,
-    });
-    console.log(
-      "userRedeemablePda Balance after:",
-      await poolBalance(userRedeemablePda, provider)
-    );
-    console.log(
-      "poolRedeemablePda Balance after:",
-      await poolBalance(poolRedeemablePda, provider)
+      `mint to pool (Mint To Address) Pool:\n after - before = ${poolBalancePost} - ${poolBalancePre} = ${
+        poolBalancePost - poolBalancePre
+      } = ${mintAmount} ? ${
+        mintAmount === poolBalancePost - poolBalancePre
+      }\n`
     );
   });
 
   it("withdraw funds", async () => {
-    // rederive as a sanity check
-    [userRedeemablePda] = findPDA({
-      seeds: [
-        wallet.publicKey.toBuffer(),
-        TOKEN_PROGRAM_ID.toBuffer(),
-        redeemableMintPda.toBuffer(),
-      ],
-      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
-    });
-
-    const ixns = [
-      SplToken.createApproveInstruction(
-        TOKEN_PROGRAM_ID,
-        userRedeemablePda,
-        statePda,
-        wallet.publicKey,
-        [],
-        amount
-      ),
-    ];
-    console.log(
-      "userRedeemablePda Balance before:",
-      await poolBalance(userRedeemablePda, provider)
-    );
-    console.log(
-      "poolRedeemablePda Balance before:",
-      await poolBalance(poolRedeemablePda, provider)
-    );
-    const signature = await program.rpc.withdraw(new BN(amount / 2), {
+    const txnWithdraw = new web3.Transaction();
+    txnWithdraw.add(programRatio.instruction.withdraw(new BN(Number(withdrawAmount)), {
       accounts: {
-        state: statePda,
-        pool: poolPda,
-        poolRedeemable: poolRedeemablePda,
-        redeemableMint: redeemableMintPda,
-        userRedeemable: userRedeemablePda,
+        state: deployer.state.pda,
+        pool: deployer.pool.pda,
+        poolCurrency: deployer.pool.currency.pda,
+        currencyMint: deployer.currency.mint,
+        userCurrency: user1.currency.assoc,
         tokenProgram: TOKEN_PROGRAM_ID,
       },
-      signers: [wallet.payer],
-      instructions: ixns,
-    });
+    }));
+
+    const userBalancePre = await getTokenBalance(user1.currency.assoc, provider, TOKEN_DECMIALS);
+    const poolBalancePre = await getTokenBalance(deployer.pool.currency.pda, provider, TOKEN_DECMIALS);
+
+    const confirmation = await handleTxn(txnWithdraw, provider, user1.wallet);
+    console.log("USER: Withdraw confirmation: ", confirmation);
+
+    const userBalancePost = await getTokenBalance(user1.currency.assoc, provider, TOKEN_DECMIALS);
+    const poolBalancePost = await getTokenBalance(deployer.pool.currency.pda, provider, TOKEN_DECMIALS);
     console.log(
-      "userRedeemablePda Balance after:",
-      await poolBalance(userRedeemablePda, provider)
+      `(withdraw) User: ${userBalancePost} (after) - ${userBalancePre} (before) = ${
+        userBalancePost - userBalancePre
+      } = ${withdrawAmount} ? ${
+        withdrawAmount === Math.abs(userBalancePost - userBalancePre)
+      }`
     );
     console.log(
-      "poolRedeemablePda Balance after:",
-      await poolBalance(poolRedeemablePda, provider)
+      `(withdraw) Pool: ${poolBalancePost} (after) - ${poolBalancePre} (before) = ${
+        poolBalancePost - poolBalancePre
+      } = ${withdrawAmount} ? ${
+        withdrawAmount === Math.abs(poolBalancePost - poolBalancePre)
+      }\n`
+    );
+  });
+
+  it("deposit funds", async () => {
+    const txnDeposit = new web3.Transaction();
+
+    // approve a token transfer
+    txnDeposit.add(
+      SplToken.createApproveInstruction(
+        TOKEN_PROGRAM_ID,
+        user1.currency.assoc,
+        deployer.state.pda,
+        user1.wallet.publicKey,
+        [],
+        depositAmount
+      )
+    );
+
+    txnDeposit.add(programRatio.instruction.deposit(new BN(Number(depositAmount)), {
+      accounts: {
+        pool: deployer.pool.pda,
+        currencyMint: deployer.currency.mint,
+        userCurrency: user1.currency.assoc,
+        poolCurrency: deployer.pool.currency.pda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        payer: user1.wallet.publicKey,
+      },
+    }));
+
+    const userBalancePreDeposit = await getTokenBalance(user1.currency.assoc, provider, TOKEN_DECMIALS);
+    const poolBalancePreDeposit = await getTokenBalance(deployer.pool.currency.pda, provider, TOKEN_DECMIALS);
+
+    const confirmation = await handleTxn(txnDeposit, provider, user1.wallet);
+    console.log("USER: Deposit confirmation: ", confirmation);
+
+    const userBalancePostDeposit = await getTokenBalance(user1.currency.assoc, provider, TOKEN_DECMIALS);
+    const poolBalancePostDeposit = await getTokenBalance(deployer.pool.currency.pda, provider, TOKEN_DECMIALS);
+    console.log(
+      `(deposit) User: after - before = ${userBalancePostDeposit} - ${userBalancePreDeposit} = ${
+        userBalancePostDeposit - userBalancePreDeposit
+      } = ${depositAmount} ? ${
+        depositAmount === -userBalancePostDeposit + userBalancePreDeposit
+      }`
+    );
+    console.log(
+      `(deposit) Pool: after - before = ${poolBalancePostDeposit} - ${poolBalancePreDeposit} = ${
+        poolBalancePostDeposit - poolBalancePreDeposit
+      } = ${depositAmount} ? ${
+        depositAmount === poolBalancePostDeposit - poolBalancePreDeposit
+      }\n`
     );
   });
 });

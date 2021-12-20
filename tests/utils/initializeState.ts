@@ -1,43 +1,48 @@
-import { web3 } from "@project-serum/anchor";
-import { Token as SplToken, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { Program } from "@project-serum/anchor";
 import { findPDA } from "./utils";
 
 // UTILITY FUNCTIONS
-export const initializeTestState = async (testParams) => {
-  const { USDC_DECIMALS, provider, program, usdcMintAuth } = testParams;
-  const wallet = provider.wallet;
-  // first create a fresh mint
-  const usdcMint = await SplToken.createMint(
-    provider.connection,
-    wallet.payer,
-    usdcMintAuth.publicKey,
-    null,
-    USDC_DECIMALS,
-    TOKEN_PROGRAM_ID
-  );
-
-  // find redeemable mint
-  const [redeemableMintPda, redeemableMintBump] = findPDA({
+export const initDeployerAccounts = (program: Program) => {
+  const [statePda, stateBump] = findPDA({
     programId: program.programId,
-    seeds: [Buffer.from("REDEEMABLE_MINT")],
+    name: "State",
   });
-  // find pdas for respective pools
+
+  const [currencyMintPda, currencyMintBump] = findPDA({
+    programId: program.programId,
+    seeds: [Buffer.from("CURRENCY_MINT")],
+  });
+
   const [poolPda, poolBump] = findPDA({
     programId: program.programId,
     name: "Pool",
-    seeds: [usdcMint.publicKey.toBuffer()],
+    seeds: [currencyMintPda.toBuffer()],
   });
-  const [poolRedeemablePda] = findPDA({
+
+  const [poolCurrencyPda, poolCurrencyAssocBump] = findPDA({
+    seeds: [
+      poolPda.toBuffer(),
+      currencyMintPda.toBuffer(),
+    ],
     programId: program.programId,
-    seeds: [Buffer.from("POOL_REDEEMABLE"), redeemableMintPda.toBuffer()],
   });
-  
-  return [
-    usdcMint,
-    poolPda,
-    poolBump,
-    poolRedeemablePda,
-    redeemableMintPda,
-    redeemableMintBump,
-  ] as [SplToken, web3.PublicKey, number, web3.PublicKey, web3.PublicKey, number];
+
+  return {
+    state: {
+      pda: statePda,
+      bump: stateBump,
+    },
+    currency: {
+      mint: currencyMintPda,
+      bump: currencyMintBump,
+    },
+    pool: {
+      pda: poolPda,
+      bump: poolBump,
+      currency: {
+        pda: poolCurrencyPda,
+        bump: poolCurrencyAssocBump,
+      },
+    },
+  };
 };

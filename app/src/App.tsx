@@ -18,29 +18,26 @@ import { useAppSelector } from "./redux/hooks";
 
 // constants
 const wallets = [getPhantomWallet()];
-interface IProps {
-  classes?: any;
-}
 
-const NavAndBodyStyles = (theme: Theme): StyleRules => ({
+// component
+const NavAndBody = withStyles((theme: Theme): StyleRules => ({
   NavAndBody: {
     minHeight: "100vh",
     justifyContent: "start",
   },
-});
-const NavAndBodyComponent: React.FC<IProps> = ({ classes }) => {
+}))(({ classes }: any) => {
   return (
     <Stack className={`${classes.NavAndBody} w100 flexcol`}>
       <Navbar />
       <Body />
     </Stack>
   );
-};
-const NavAndBody = withStyles(NavAndBodyStyles)(NavAndBodyComponent);
+});
 
-const AppStyles = (theme: Theme): StyleRules => ({
+// main
+const App = withStyles((theme: Theme): StyleRules => ({
   App: {
-    backgroundColor: "#eaebe8",
+    backgroundColor: "#eff2f4",
     minWidth: "100vw",
     maxWidth: "100vw",
     width: "100vw",
@@ -53,17 +50,14 @@ const AppStyles = (theme: Theme): StyleRules => ({
       position: "relative",
     },
   },
-});
-console.log('working here')
-const AppComponent: React.FC<IProps> = ({ classes }) => {
-  const endpoint: string = useAppSelector((s) => s.endpoint);
-  const onWalletError = useCallback((error) => {
-    // enqueueSnackbar(
-    //   error.message ? `${error.name}: ${error.message}` : error.name,
-    //   { variant: "error" }
-    // );
+}))(({ classes }: any) => {
+  // state
+  const endpoint: string = useAppSelector(s => s.endpoint);
+  // callbacks
+  const onWalletError = useCallback(error => {
     console.error(error);
   }, []);
+
   return (
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} onError={onWalletError} autoConnect>
@@ -71,12 +65,11 @@ const AppComponent: React.FC<IProps> = ({ classes }) => {
           <Stack className={`${classes.App}`}>
             <NavAndBody />
             <Footer />
-          </Stack>
+          </Stack> 
         </WalletDialogProvider>
       </WalletProvider>
     </ConnectionProvider>
   );
-};
-const App = withStyles(AppStyles)(AppComponent);
+});
 
 export default App;

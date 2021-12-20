@@ -1,11 +1,11 @@
-use anchor_lang::{prelude::*};
+use anchor_lang::prelude::*;
+
 #[account]
 #[derive(Default)]
 pub struct Pool {
     pub bump: u8,
-    pub usdc_mint: Pubkey,
-    pub redeemable_mint: Pubkey,
-    pub pool_redeemable: Pubkey,
+    pub currency_mint: Pubkey,
+    pub pool_currency: Pubkey,
 }
 
 #[account]

@@ -1,14 +1,11 @@
 [programs.localnet]
 ratio = "6cDMc7baVfghT4sUx1t3sEfohxXyj4XwDr8pbarQfz1z"
-
-[registry]
-url = "https://anchor.projectserum.com"
+mint_and_deposit = "9AWyK1cbjJxP5HLctXeiG1ZHRkZo7sUiy7km7SCtjG9G"
 
 [provider]
 cluster = "localnet"
-wallet = "/Users/matthias/.config/solana/id.json"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
-test-web = "ts-mocha -p ./tsconfig.json -t 1000000 tests/web.ts"
-web = "ts-mocha -p ./tsconfig.json -t 1000000 tests/web.ts"
+copyIdl = "node copy_idl.js"
