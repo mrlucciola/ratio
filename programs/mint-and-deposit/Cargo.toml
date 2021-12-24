@@ -1,12 +1,12 @@
 [package]
-name = "ratio"
+name = "mint-and-deposit"
 version = "0.1.0"
-description = "Created with Anchor"
-edition = "2018"
+edition = "2021"
+description = "Created after Anchor"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "ratio"
+name = "mint_and_deposit"
 
 [features]
 no-entrypoint = []
@@ -14,8 +14,11 @@ no-idl = []
 cpi = ["no-entrypoint"]
 default = []
 
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [dependencies]
 anchor-lang = "0.19.0"
 anchor-spl = "0.19.0"
 spl-token = { version = "3.2",  features = ["no-entrypoint"] }
 spl-associated-token-account = {version = "1.0.3", features = ["no-entrypoint"]}
+ratio = { path = "../ratio", features = ["cpi"] }

@@ -1,0 +1,45 @@
+{
+  "version": "0.0.0",
+  "name": "mint_and_deposit",
+  "instructions": [
+    {
+      "name": "mintAndDepositCpi",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "currencyMint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "destCurrency",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ratioProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "mintAmount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "address": "9AWyK1cbjJxP5HLctXeiG1ZHRkZo7sUiy7km7SCtjG9G"
+  }
+}
