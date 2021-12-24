@@ -12,7 +12,6 @@
     "@mui/material": "^5.2.2",
     "@mui/styled-engine-sc": "^5.1.0",
     "@mui/styles": "^5.2.2",
-    "@project-serum/anchor": "^0.18.2",
     "@rollup/plugin-babel": "^5.3.0",
     "@solana/spl-token": "^0.1.8",
     "@solana/wallet-adapter-base": "^0.8.1",

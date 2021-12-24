@@ -81,7 +81,7 @@ export async function getTokenBalance(
     await provider.connection.getTokenAccountBalance(assocToken);
 
   return decimals
-    ? Number(res.value.amount) ** (1 / decimals)
+    ? Number(res.value.amount) * 10 ** (-decimals)
     : Number(res.value.amount);
 }
 export async function getBalance(

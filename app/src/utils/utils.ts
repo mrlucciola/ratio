@@ -1,5 +1,4 @@
-// @ts-ignore
-import { Provider, utils, web3, getProvider, Wallet } from "@project-serum/anchor";
+import { Provider, utils, Wallet, web3 } from "@project-serum/anchor";
 import { Connection } from "@solana/web3.js";
 import { sha256 } from "js-sha256";
 import {
@@ -30,14 +29,9 @@ export async function getTokenBalance(
     await provider.connection.getTokenAccountBalance(assocToken);
 
   return decimals
-    ? Number(res.value.amount) ** (1 / decimals)
+    ? Number(res.value.amount) / decimals
     : Number(res.value.amount);
 }
-
-export const updateTokenBalance = async (assocAcct: web3.PublicKey, provider: Provider, fxn: any, dispatch: any) => {
-  const tokenBalance = await getTokenBalance(assocAcct, provider);
-  dispatch(fxn(Number(tokenBalance)));
-};
 
 interface IgenerateSeedsArr {
   name?: string;
@@ -99,8 +93,7 @@ export const sendSingleIxnTxn = async (ixn: web3.TransactionInstruction, wallet:
     await connection.getRecentBlockhash()
   ).blockhash;
   const resMain: string = await provider.send(txn);
-  await connection.confirmTransaction(resMain, 'processed');
-  return resMain;
+  return await connection.confirmTransaction(resMain, 'processed');
 };
 
 export const handleTxn = async (
@@ -109,9 +102,7 @@ export const handleTxn = async (
   wallet_: Wallet,
 ) => {
   txn_.feePayer = wallet_.publicKey;
-  txn_.recentBlockhash = (
-    await provider_.connection.getRecentBlockhash()
-  ).blockhash;
+  txn_.recentBlockhash = (await provider_.connection.getRecentBlockhash()).blockhash;
   const signedTxn: web3.Transaction = await wallet_.signTransaction(txn_);
   const resMain: string = await provider_.send(signedTxn);
   await provider_.connection.confirmTransaction(resMain);
@@ -119,7 +110,8 @@ export const handleTxn = async (
 };
 
 export const checkIfAccountExists = async (provider: Provider, wallet: Wallet, userTokenAssoc: web3.PublicKey, tokenMint: web3.PublicKey) => {
-  if (!(await getProvider().connection.getAccountInfo(userTokenAssoc))) {
+  if (!(await provider.connection.getAccountInfo(userTokenAssoc))) {
+    console.log('DOESNT EXIST')
     const txnUserAssoc = new web3.Transaction();
     txnUserAssoc.add(
       SplToken.createAssociatedTokenAccountInstruction(
@@ -133,8 +125,10 @@ export const checkIfAccountExists = async (provider: Provider, wallet: Wallet, u
     );
     try {
       const confirmationUserAssoc = await handleTxn(txnUserAssoc, provider, wallet);
+      console.log('success')
       return confirmationUserAssoc;
     } catch (error) {
+      console.log('error')
       console.log(error);
     }
   }

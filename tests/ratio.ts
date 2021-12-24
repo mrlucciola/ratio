@@ -108,7 +108,7 @@ describe("ratio", () => {
   });
 
   it('init user account', async () => {
-    if (!await getProvider().connection.getAccountInfo(deployer.currency.mint)) {
+    if (!await getProvider().connection.getAccountInfo(user1.currency.assoc)) {
       const txnUserAssoc = new web3.Transaction();
       txnUserAssoc.add(
         SplToken.createAssociatedTokenAccountInstruction(
@@ -132,7 +132,7 @@ describe("ratio", () => {
 
   it("mint to pool cpi", async () => {
     const txnMint = new web3.Transaction();
-    const poolBalancePre = await getTokenBalance(deployer.pool.currency.pda,provider);
+    const poolBalancePre = await getTokenBalance(deployer.pool.currency.pda, provider);
 
     txnMint.add(programMintCpi.instruction.mintAndDepositCpi(
       new BN(Number(mintAmount)),
@@ -176,14 +176,14 @@ describe("ratio", () => {
       },
     }));
 
-    const userBalancePre = await getTokenBalance(user1.currency.assoc, provider, TOKEN_DECMIALS);
-    const poolBalancePre = await getTokenBalance(deployer.pool.currency.pda, provider, TOKEN_DECMIALS);
+    const userBalancePre = await getTokenBalance(user1.currency.assoc, provider);
+    const poolBalancePre = await getTokenBalance(deployer.pool.currency.pda, provider);
 
     const confirmation = await handleTxn(txnWithdraw, provider, user1.wallet);
     console.log("USER: Withdraw confirmation: ", confirmation);
 
-    const userBalancePost = await getTokenBalance(user1.currency.assoc, provider, TOKEN_DECMIALS);
-    const poolBalancePost = await getTokenBalance(deployer.pool.currency.pda, provider, TOKEN_DECMIALS);
+    const userBalancePost = await getTokenBalance(user1.currency.assoc, provider);
+    const poolBalancePost = await getTokenBalance(deployer.pool.currency.pda, provider);
     console.log(
       `(withdraw) User: ${userBalancePost} (after) - ${userBalancePre} (before) = ${
         userBalancePost - userBalancePre
@@ -226,19 +226,19 @@ describe("ratio", () => {
       },
     }));
 
-    const userBalancePreDeposit = await getTokenBalance(user1.currency.assoc, provider, TOKEN_DECMIALS);
-    const poolBalancePreDeposit = await getTokenBalance(deployer.pool.currency.pda, provider, TOKEN_DECMIALS);
+    const userBalancePreDeposit = await getTokenBalance(user1.currency.assoc, provider);
+    const poolBalancePreDeposit = await getTokenBalance(deployer.pool.currency.pda, provider);
 
     const confirmation = await handleTxn(txnDeposit, provider, user1.wallet);
     console.log("USER: Deposit confirmation: ", confirmation);
 
-    const userBalancePostDeposit = await getTokenBalance(user1.currency.assoc, provider, TOKEN_DECMIALS);
-    const poolBalancePostDeposit = await getTokenBalance(deployer.pool.currency.pda, provider, TOKEN_DECMIALS);
+    const userBalancePostDeposit = await getTokenBalance(user1.currency.assoc, provider);
+    const poolBalancePostDeposit = await getTokenBalance(deployer.pool.currency.pda, provider);
     console.log(
       `(deposit) User: after - before = ${userBalancePostDeposit} - ${userBalancePreDeposit} = ${
-        userBalancePostDeposit - userBalancePreDeposit
+        Math.abs(userBalancePostDeposit - userBalancePreDeposit)
       } = ${depositAmount} ? ${
-        depositAmount === -userBalancePostDeposit + userBalancePreDeposit
+        depositAmount === Math.abs(userBalancePostDeposit - userBalancePreDeposit)
       }`
     );
     console.log(

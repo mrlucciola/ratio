@@ -4,44 +4,44 @@ import React, { useEffect } from "react";
 import withStyles, { StyleRules } from "@mui/styles/withStyles";
 import { Divider, Stack, Theme } from "@mui/material";
 // web3
-import { useAnchorWallet } from "@solana/wallet-adapter-react";
-import { web3, Wallet } from "@project-serum/anchor";
-// components
-import UserBalance from "./balances/UserBalance";
-import PoolBalance from "./balances/PoolBalance";
-// utils
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
 import { updatePoolAmount, updateUserAmount } from "../redux/reducer";
-import { getAssocTokenAcct, GetProvider, updateTokenBalance } from "../utils/utils";
+import { getAssocTokenAcct, GetProvider, getTokenBalance } from "../utils/utils";
+import { AnchorWallet, useAnchorWallet } from "@solana/wallet-adapter-react";
+import { web3 } from "@project-serum/anchor";
+import UserBalance from "./balances/UserBalance";
+import PoolBalance from "./balances/PoolBalance";
 
 
 const Balances = withStyles((theme: Theme): StyleRules => ({
   Balances: {
     padding: '10px 0',
+    '& > div': {
+    },
   },
 }))(({ classes }: any) => {
   // init hooks
   const dispatch = useAppDispatch();
   const wallet = useAnchorWallet();
+  const isWallet = wallet && wallet.publicKey.toString();
   // state
   const endpoint = useAppSelector(s => s.endpoint);
-  const poolCurrencyAssoc = useAppSelector(s => s.pool.currencyAssoc) as web3.PublicKey;
+  const poolCurrencyPda = useAppSelector(s => s.pool.currencyPda) as web3.PublicKey;
   const currencyMintPda = useAppSelector(s => s.currency.pda) as web3.PublicKey;
-  console.log('poolCurrencyAssoc', poolCurrencyAssoc)
   // fxns
-  const fetchBalance = async (wallet: Wallet | undefined) => {
+  const fetchBalance = async (wallet: AnchorWallet | undefined) => {
     const [provider] = GetProvider(wallet, endpoint);
-    await updateTokenBalance(poolCurrencyAssoc, provider, updatePoolAmount, dispatch);
+    const poolBalance = await getTokenBalance(poolCurrencyPda, provider);
+    dispatch(updatePoolAmount(Number(poolBalance)));
     if (wallet) {
       const [userCurrencyAssoc] = getAssocTokenAcct(wallet.publicKey, currencyMintPda);
-      await updateTokenBalance(userCurrencyAssoc, provider, updateUserAmount, dispatch);
+      const userBalance = await getTokenBalance(userCurrencyAssoc, provider);
+      dispatch(updateUserAmount(Number(userBalance)));
     }
   };
   // effects
-  const isWallet = wallet && wallet.publicKey.toString();
   useEffect(() => {
-    fetchBalance(wallet as Wallet);
-    // eslint-disable-next-line
+    fetchBalance(wallet);
   }, [isWallet]);
   
   return (

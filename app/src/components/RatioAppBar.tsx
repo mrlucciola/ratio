@@ -1,14 +1,24 @@
-// react
 import React, { useState } from 'react';
-// mui
 import withStyles from "@mui/styles/withStyles";
 import { AppBar, Box, Button, IconButton, Menu, MenuItem, Theme, Toolbar, Typography } from "@mui/material";
-import { StyleRules } from "@mui/styles";
+import { useAppDispatch, useAppSelector } from "../redux/hooks";
+import { styled, StyleRules } from "@mui/styles";
 import { Menu as MenuIcon } from "@mui/icons-material";
 import { grey } from '@mui/material/colors';
-// utils
-import { useAppDispatch, useAppSelector } from "../redux/hooks";
 import { setAction } from '../redux/reducer';
+
+const StyledToolbar = styled(Toolbar)(({ theme }: any) => ({
+  // alignItems: 'flex-start',
+  paddingTop: '0.2em',
+  paddingBottom: '1em',
+  '&.MuiToolbar-root': {
+    // height: 80,
+  },
+  // Override media queries injected by theme.mixins.toolbar
+  '@media all': {
+    // minHeight: 128,
+  },
+}));
 
 // main
 const RatioAppBar = withStyles((theme: Theme): StyleRules => ({

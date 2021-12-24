@@ -5,7 +5,7 @@ import idlRatio from "../ratio_idl.json";
 interface IPda {
   pda: web3.PublicKey,
   bump: number,
-  currencyAssoc?: web3.PublicKey,
+  currencyPda?: web3.PublicKey,
 }
 interface IinitState {
   action: string;
@@ -42,7 +42,7 @@ export const initState: IinitState = {
   },
   pool: {
     pda: new web3.PublicKey("4buB8xpiFM3NmBgKtrjJ7k3Z8vjuC1E9mba4PMnftb7S"),
-    currencyAssoc: new web3.PublicKey("HZKE3rqqX6SiCNdbYjMTpu3xVGK6HnkiJzyPvxyaKMGw"),
+    currencyPda: new web3.PublicKey("HZKE3rqqX6SiCNdbYjMTpu3xVGK6HnkiJzyPvxyaKMGw"),
     bump: 251,
   },
   poolAmount: 0,

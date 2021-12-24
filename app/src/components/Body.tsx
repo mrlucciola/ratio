@@ -1,5 +1,5 @@
 // react
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useState } from "react";
 // mui
 import withStyles, { StyleRules } from "@mui/styles/withStyles";
 import {
@@ -11,30 +11,37 @@ import {
   Theme,
   Typography,
 } from "@mui/material";
-import MuiAlert from '@mui/material/Alert';
 // web3
-import { useAnchorWallet } from "@solana/wallet-adapter-react";
+import { AnchorWallet, useAnchorWallet, useWallet } from "@solana/wallet-adapter-react";
 import {
   Program,
   BN,
   web3,
-  // Provider,
   Wallet,
 } from "@project-serum/anchor";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { Connection, Transaction } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID, Token as SplToken, } from "@solana/spl-token";
 // components
 import Balances from "./Balances";
 import RatioAppBar from "./RatioAppBar";
 // utils
-import { checkIfAccountExists, getAssocTokenAcct, GetProvider, handleTxn, updateTokenBalance } from "../utils/utils";
+import { checkIfAccountExists, getAssocTokenAcct, GetProvider, getTokenBalance, handleTxn, sendSingleIxnTxn } from "../utils/utils";
 import { updatePoolAmount, updateUserAmount } from "../redux/reducer";
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
+import { useEffect } from "react";
 
-// component
+import MuiAlert from '@mui/material/Alert';
+
 const Alert: any = React.forwardRef(function Alert(props, ref) {
   // @ts-ignore
   return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
 });
+
+// @ts-ignore
+const handleClick = (setToastMsg, action, input) => {
+  setToastMsg(`Submitting ${action.toLowerCase()} for ${input} tokens`);
+};
+const handleClose = (setIsOpen: any) => () => {setIsOpen(false)};
 
 const Body = withStyles((theme: Theme): StyleRules => {
   const radiusAmt = 10;
@@ -64,6 +71,8 @@ const Body = withStyles((theme: Theme): StyleRules => {
 })(({ classes }: any) => {
   // init hooks
   const wallet = useAnchorWallet();
+  // @ts-ignore
+  const isWallet = wallet && wallet?.toString();
   const dispatch = useAppDispatch();
   // state
   const action: string = useAppSelector((s) => s.action);
@@ -73,62 +82,70 @@ const Body = withStyles((theme: Theme): StyleRules => {
   const idlRatio = useAppSelector(s => s.idlRatio);
   const idlMintAndDeposit = useAppSelector(s => s.idlMintAndDeposit);
   const currencyMintPda = useAppSelector(s => s.currency.pda);
-  const programIdRatio = useAppSelector(s => s.programIdRatio);
+  const poolCurrencyPda = useAppSelector(s => s.pool.currencyPda) as web3.PublicKey;
   const programIdMintAndDeposit = useAppSelector(s => s.programIdMintAndDeposit);
+  const programIdRatio = useAppSelector(s => s.programIdRatio);
   const statePda = useAppSelector(s => s.state.pda);
   const poolPda = useAppSelector(s => s.pool.pda);
-  const [poolCurrencyAssoc] = getAssocTokenAcct(poolPda, currencyMintPda);
-  // doing this to silence the linter
-  const isWallet = wallet && wallet.publicKey.toString();
+
   // fxns
-  const handleClick = () => {
-    setToastMsg(`Submitting ${action.toLowerCase()} for ${input} tokens`);
-  };
-  const handleClose = () => {
-    setIsOpen(false)
-  };
   
-  // effects
-  useEffect(() => {
-    setIsOpen(toastMsg === '' ? false : true);
-  }, [toastMsg])
-  // callbacks
+  useEffect(() => {setIsOpen(toastMsg === '' ? false : true)}, [toastMsg])
+  
   const deposit = useCallback(
     async (depositAmount: number) => {
-      const [userCurrencyAssoc] = getAssocTokenAcct(wallet?.publicKey as any, currencyMintPda);
-      const [provider] = GetProvider(wallet, 'http://127.0.0.1:8899');
-      await checkIfAccountExists(provider, wallet as Wallet, userCurrencyAssoc, currencyMintPda);
-      const program: Program = new Program(idlRatio, programIdRatio, provider);
-      const txnDeposit = new web3.Transaction();
-      txnDeposit.add(program.instruction.deposit(
-        new BN(depositAmount),
-        {
-          accounts: {
-            pool: poolPda,
-            currencyMint: currencyMintPda,
-            userCurrency: userCurrencyAssoc,
-            poolCurrency: poolCurrencyAssoc,
-            tokenProgram: TOKEN_PROGRAM_ID,
-            payer: wallet?.publicKey as web3.PublicKey,
-          },
-        }
-      ));
-      await handleTxn(txnDeposit, provider, wallet as Wallet);
-      setInput("");
-      await updateTokenBalance(poolCurrencyAssoc, provider, updatePoolAmount, dispatch);
-      await updateTokenBalance(userCurrencyAssoc, provider, updateUserAmount, dispatch);
+      try {
+        const [userCurrencyAssoc] = getAssocTokenAcct(wallet?.publicKey as any, currencyMintPda);
+        const [provider] = GetProvider(wallet, 'http://127.0.0.1:8899');
+        await checkIfAccountExists(provider, wallet as Wallet, userCurrencyAssoc, currencyMintPda);
+
+        const program: Program = new Program(idlRatio, programIdRatio, provider);
+        const txn = (new web3.Transaction()).add(
+          SplToken.createApproveInstruction(
+            TOKEN_PROGRAM_ID,
+            userCurrencyAssoc,
+            statePda,
+            wallet?.publicKey as web3.PublicKey,
+            [],
+            depositAmount
+          )
+        );
+        txn.add(program.instruction.deposit(
+          new BN(depositAmount),
+          {
+            accounts: {
+              pool: poolPda,
+              currencyMint: currencyMintPda,
+              userCurrency: userCurrencyAssoc,
+              poolCurrency: poolCurrencyPda,
+              tokenProgram: TOKEN_PROGRAM_ID,
+              payer: wallet?.publicKey as web3.PublicKey,
+            },
+          }
+        ));
+        const receipt = await handleTxn(txn, provider, wallet as Wallet);
+        console.log('receiptreceipt', receipt)
+        setInput("");
+        const poolBalance = await getTokenBalance(poolCurrencyPda, provider);
+        dispatch(updatePoolAmount(Number(poolBalance)));
+        
+        const userBalance = await getTokenBalance(userCurrencyAssoc, provider);
+        dispatch(updateUserAmount(Number(userBalance)));
+      } catch (error) {
+        console.log(error);
+      }
     },
-    // eslint-disable-next-line
-    [poolCurrencyAssoc, statePda, currencyMintPda, isWallet],
+    [poolCurrencyPda.toString(), statePda.toString(), currencyMintPda.toString(), isWallet],
+    // [isWallet],
   );
   const withdraw = useCallback(
     async (withdrawAmount: number) => {
       const [userCurrencyAssoc] = getAssocTokenAcct(wallet?.publicKey as any, currencyMintPda);
-      const [provider] = GetProvider(wallet, 'http://127.0.0.1:8899');
+      const [provider, connection] = GetProvider(wallet, 'http://127.0.0.1:8899');
       const program: Program = new Program(idlRatio, programIdRatio, provider);
       await checkIfAccountExists(provider, wallet as Wallet, userCurrencyAssoc, currencyMintPda);
-      const txn = new web3.Transaction();
-      txn.add(program.instruction.withdraw(
+
+      const txn = (new web3.Transaction()).add(program.instruction.withdraw(
         new BN(withdrawAmount),
         {
           accounts: {
@@ -136,7 +153,7 @@ const Body = withStyles((theme: Theme): StyleRules => {
             currencyMint: currencyMintPda,
             userCurrency: userCurrencyAssoc,
             tokenProgram: TOKEN_PROGRAM_ID,
-            poolCurrency: poolCurrencyAssoc,
+            poolCurrency: poolCurrencyPda,
             pool: poolPda,
             payer: wallet?.publicKey as web3.PublicKey,
           },
@@ -144,44 +161,42 @@ const Body = withStyles((theme: Theme): StyleRules => {
       ));
       await handleTxn(txn, provider, wallet as Wallet);
       setInput("");
-      await updateTokenBalance(poolCurrencyAssoc, provider, updatePoolAmount, dispatch);
-      await updateTokenBalance(userCurrencyAssoc, provider, updateUserAmount, dispatch);
+      const poolBalance = await getTokenBalance(poolCurrencyPda, provider);
+      dispatch(updatePoolAmount(Number(poolBalance)));
+      
+      const userBalance = await getTokenBalance(userCurrencyAssoc, provider);
+      dispatch(updateUserAmount(Number(userBalance)));
     },
-    // eslint-disable-next-line
-    [poolCurrencyAssoc, statePda, currencyMintPda, isWallet],
+    [poolCurrencyPda.toString(), statePda.toString(), currencyMintPda.toString(), isWallet],
   );
   const mintToPool = useCallback(
     async (mintAmount: number) => {
       const [provider] = GetProvider(wallet, 'http://127.0.0.1:8899');
       const program: Program = new Program(idlMintAndDeposit, programIdMintAndDeposit, provider);
-      const txnMint = new web3.Transaction();
-      txnMint.add(program.instruction.mintAndDepositCpi(
+      const txn = (new web3.Transaction()).add(program.instruction.mintAndDepositCpi(
         new BN(mintAmount),
         {
           accounts: {
             state: statePda,
             currencyMint: currencyMintPda,
-            destCurrency: poolCurrencyAssoc,
-            tokenProgram: TOKEN_PROGRAM_ID,
+            destCurrency: poolCurrencyPda,
             ratioProgram: programIdRatio,
+            tokenProgram: TOKEN_PROGRAM_ID,
           },
         }
       ));
-      try {
-        await handleTxn(txnMint, provider, wallet as Wallet);
-      } catch (error) {
-        // @ts-ignore
-        console.log(error.code, error.msg);
-      }
+      await handleTxn(txn, provider, wallet as Wallet);
+
+      // update state
       setInput("");
-      await updateTokenBalance(poolCurrencyAssoc, provider, updatePoolAmount, dispatch);
+      const poolBalance = await getTokenBalance(poolCurrencyPda, provider);
+      dispatch(updatePoolAmount(Number(poolBalance)));
     },
-    // eslint-disable-next-line
-    [poolCurrencyAssoc, statePda, currencyMintPda, isWallet],
+    [poolCurrencyPda.toString(), statePda.toString(), currencyMintPda.toString(), isWallet],
   );
-  const submitAction = async () => {
+  const submitAction = useCallback(async () => {
     if (["Deposit", "Withdraw", "Mint"].includes(action)) {
-      handleClick();
+      handleClick(setToastMsg, action, input);
       try {
         action === "Deposit" && (await deposit(Number(input)));
         action === "Withdraw" && (await withdraw(Number(input)));
@@ -191,7 +206,7 @@ const Body = withStyles((theme: Theme): StyleRules => {
         setToastMsg(`error: ${error}`);
       }
     }
-  };
+  }, [action, input],);
 
   return (
     <Stack flexDirection="row" alignItems="center">
@@ -231,7 +246,7 @@ const Body = withStyles((theme: Theme): StyleRules => {
         <Snackbar
           anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
           open={isOpen}
-          onClose={handleClose}
+          onClose={handleClose(setIsOpen)}
           message={toastMsg}
           autoHideDuration={3000}
           resumeHideDuration={1000}

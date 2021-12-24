@@ -6,6 +6,7 @@ import { Button, Divider, Theme, Typography } from "@mui/material";
 import { grey, teal } from "@mui/material/colors";
 // web3
 import { WalletMultiButton } from "@solana/wallet-adapter-material-ui";
+import Balances from "./Balances";
 // components
 // interfaces
 // component
@@ -42,10 +43,12 @@ const RatioLogo = withStyles((theme: Theme): StyleRules => ({
  */
 const Navbar = withStyles((theme: Theme): StyleRules => ({
   Navbar: {
+    // backgroundColor: "#939393",
     minHeight: "70px",
     width: "100%",
     minWidth: "100%",
     display: "flex",
+    // borderBottom: `1px solid `,
   },
   mainNav: {},
   Button: {
